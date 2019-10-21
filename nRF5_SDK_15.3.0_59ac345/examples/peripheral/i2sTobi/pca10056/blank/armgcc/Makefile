@@ -69,6 +69,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/libraries/log/src \
   $(SDK_ROOT)/external/fprintf \
   $(SDK_ROOT)/components/libraries/atomic \
+  $(SDK_ROOT)/external/opus/include/opus \
 
 # Libraries common to all targets
 LIB_FILES += \
