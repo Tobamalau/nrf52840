@@ -1,0 +1,66 @@
+# First, ignore everything
+/*
+# Opus
+!/nRF5_SDK_15.3.0_59ac345
+/nRF5_SDK_15.3.0_59ac345/*
+!/nRF5_SDK_15.3.0_59ac345/external
+/nRF5_SDK_15.3.0_59ac345/external/*
+!/nRF5_SDK_15.3.0_59ac345/external/opus
+#Toolchain
+!/nRF5_SDK_15.3.0_59ac345
+/nRF5_SDK_15.3.0_59ac345/*/nRF5_SDK_15.3.0_59ac345
+/nRF5_SDK_15.3.0_59ac345/*
+!/nRF5_SDK_15.3.0_59ac345/components/
+/nRF5_SDK_15.3.0_59ac345/components/*
+!/nRF5_SDK_15.3.0_59ac345/components/toolchain/
+/nRF5_SDK_15.3.0_59ac345/components/toolchain/*
+!/nRF5_SDK_15.3.0_59ac345/components/toolchain/gcc
+#/nRF5_SDK_15.3.0_59ac345/components/toolchain/gcc/*
+
+# Project i2sTobi
+!/nRF5_SDK_15.3.0_59ac345/examples
+/nRF5_SDK_15.3.0_59ac345/examples/*
+!/nRF5_SDK_15.3.0_59ac345/examples/peripheral
+/nRF5_SDK_15.3.0_59ac345/examples/peripheral/*
+!/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sTobi
+
+# And all the file types you're interested in.
+!.gitignore
+!README.md
+
+*.zip
+*.pdf
+*.bin
+
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+**/pca10040/*
+**/arm4/*
+**/arm5_no_packs/*
+**/iar/*
+
+
