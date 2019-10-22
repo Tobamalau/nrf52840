@@ -26,6 +26,7 @@
 "Output/i2s_pca10056 Release/Obj/nrfx_uarte.o"
 "Output/i2s_pca10056 Release/Obj/main.o"
 "../../../../../../external/opus/lib/libopus.a"
+"Output/i2s_pca10056 Release/Obj/opusTobi.o"
 "Output/i2s_pca10056 Release/Obj/SEGGER_RTT.o"
 "Output/i2s_pca10056 Release/Obj/SEGGER_RTT_Syscalls_SES.o"
 "Output/i2s_pca10056 Release/Obj/SEGGER_RTT_printf.o"
