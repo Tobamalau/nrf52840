@@ -118,7 +118,7 @@ LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 LDFLAGS += -Wl,--gc-sections
 # use newlib in nano version
 LDFLAGS += --specs=nano.specs
-LDFLAGS += -L/home/tobias/src/nrf52840-DK/nRF5_SDK_15.3.0_59ac345/components/opus/lib
+LDFLAGS += -L$(SDK_ROOT)/external/opus/lib
 
 
 nrf52840_xxaa: CFLAGS += -D__HEAP_SIZE=8192
