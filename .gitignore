@@ -1,29 +1,35 @@
 # First, ignore everything
-/*
+#/*
 # Opus
-!/nRF5_SDK_15.3.0_59ac345
-/nRF5_SDK_15.3.0_59ac345/*
-!/nRF5_SDK_15.3.0_59ac345/external
-/nRF5_SDK_15.3.0_59ac345/external/*
-!/nRF5_SDK_15.3.0_59ac345/external/opus
-#Toolchain
-!/nRF5_SDK_15.3.0_59ac345
-/nRF5_SDK_15.3.0_59ac345/*/nRF5_SDK_15.3.0_59ac345
-/nRF5_SDK_15.3.0_59ac345/*
-!/nRF5_SDK_15.3.0_59ac345/components/
-/nRF5_SDK_15.3.0_59ac345/components/*
-!/nRF5_SDK_15.3.0_59ac345/components/toolchain/
-/nRF5_SDK_15.3.0_59ac345/components/toolchain/*
-!/nRF5_SDK_15.3.0_59ac345/components/toolchain/gcc
-#/nRF5_SDK_15.3.0_59ac345/components/toolchain/gcc/*
+#!/nRF5_SDK_15.3.0_59ac345
+#/nRF5_SDK_15.3.0_59ac345/*
+#!/nRF5_SDK_15.3.0_59ac345/external
+#/nRF5_SDK_15.3.0_59ac345/external/*
+#!/nRF5_SDK_15.3.0_59ac345/external/opus
+##Toolchain
+#!/nRF5_SDK_15.3.0_59ac345
+#/nRF5_SDK_15.3.0_59ac345/*/nRF5_SDK_15.3.0_59ac345
+#/nRF5_SDK_15.3.0_59ac345/*
+#!/nRF5_SDK_15.3.0_59ac345/components/
+#/nRF5_SDK_15.3.0_59ac345/components/*
+#!/nRF5_SDK_15.3.0_59ac345/components/toolchain/
+#/nRF5_SDK_15.3.0_59ac345/components/toolchain/*
+#!/nRF5_SDK_15.3.0_59ac345/components/toolchain/gcc
+##/nRF5_SDK_15.3.0_59ac345/components/toolchain/gcc/*
 
-# Project i2sTobi
-!/nRF5_SDK_15.3.0_59ac345/examples
-/nRF5_SDK_15.3.0_59ac345/examples/*
-!/nRF5_SDK_15.3.0_59ac345/examples/peripheral
-/nRF5_SDK_15.3.0_59ac345/examples/peripheral/*
-!/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sTobi
+## Project i2sTobi
+#!/nRF5_SDK_15.3.0_59ac345/examples
+#/nRF5_SDK_15.3.0_59ac345/examples/*
+#!/nRF5_SDK_15.3.0_59ac345/examples/peripheral
+#/nRF5_SDK_15.3.0_59ac345/examples/peripheral/*
+#!/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sTobi
 
+
+/nRF5_SDK_15.3.0_59ac345/
+/nRF5_SDK_15.0.0_a53641a/
+/nRF52ExtendedAdvertisementsBluetooth5/*
+/nrf51-ble-tutorial-advertising/*
+nrf51-ble-tutorial-advertising/
 # And all the file types you're interested in.
 !.gitignore
 !README.md
