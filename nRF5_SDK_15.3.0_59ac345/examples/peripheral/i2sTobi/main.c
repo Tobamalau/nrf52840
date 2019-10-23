@@ -6,15 +6,12 @@
 //#include "opusFile.c"
 #include "opusTobi.h"
 
-/*
-struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
-struct frame FrameInstanz = {&OpusInstanz, 0, 0};
-
-volatile int NBbytes[] = {249,134,135,258,189,161,161,161,161,161,161,161,161,161,161,161,161,161,161,161,
-                          104,114,207,175,181,162,184,161,161,161,161,145,177,161,161,157,165,152,137,193,
-                          144,179,154,168,161,161,161,161,161,161,161,137,128,161,148,142,166};
-*/
-
+/*Anfang Uart Init*/
+#include "boards.h"
+#include "app_uart.h"
+#define UART_TX_BUF_SIZE                256                                         /**< UART TX buffer size. */
+#define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
+/*Ende Uart Init*/
 
 
 void initI2S()
@@ -26,7 +23,7 @@ void initI2S()
    // MCKFREQ
    NRF_I2S->CONFIG.MCKFREQ = I2S_CONFIG_MCKFREQ_MCKFREQ_32MDIV21  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
    // Ratio = 96
-   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_64X << I2S_CONFIG_RATIO_RATIO_Pos;
+   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_64X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
    // Master mode, 16Bit, left aligned
    NRF_I2S->CONFIG.MODE = I2S_CONFIG_MODE_MODE_MASTER << I2S_CONFIG_MODE_MODE_Pos;
    NRF_I2S->CONFIG.SWIDTH = I2S_CONFIG_SWIDTH_SWIDTH_16BIT << I2S_CONFIG_SWIDTH_SWIDTH_Pos;
@@ -49,11 +46,44 @@ void initI2S()
    //printf("NRF_I2S->RXTXD.MAXCNT:%d,%d,%d", NRF_I2S->RXTXD.MAXCNT,  sizeof(sine_table), sizeof(uint32_t));
 }
 
+/**@snippet [Handling the data received over UART] */
+void uart_event_handle(app_uart_evt_t * p_event)
+{
+	// Look at the UART example.
+}
 
+/**@brief  Function for initializing the UART module.
+ */
+/**@snippet [UART Initialization] */
+static uint32_t uart_init(void)
+{
+    uint32_t                     err_code;
+    const app_uart_comm_params_t comm_params =
+    {
+        RX_PIN_NUMBER,
+        TX_PIN_NUMBER,
+        RTS_PIN_NUMBER,
+        CTS_PIN_NUMBER,
+        APP_UART_FLOW_CONTROL_DISABLED,
+        false,
+        UART_BAUDRATE_BAUDRATE_Baud115200
+    };
+    APP_UART_FIFO_INIT( &comm_params,
+                       UART_RX_BUF_SIZE,
+                       UART_TX_BUF_SIZE,
+                       uart_event_handle,
+                       APP_IRQ_PRIORITY_LOWEST,
+                       err_code);
+    return err_code;
+    //APP_ERROR_CHECK(err_code);
+}
 
 int main(void)
 {
-   printf("Start");
+   uint32_t err_t;
+   err_t = uart_init();
+
+   printf("\n\nUart Init:%ld\n", err_t);
    initI2S();
 
 /*
@@ -67,11 +97,12 @@ int main(void)
    volatile uint_fast8_t newFrame = 0;
    struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
+   initOpus(&OpusInstanz);
+   printf("Opus Init\n");
 
    getPcm(&FrameInstanz);
    NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes;
    NRF_I2S->RXTXD.MAXCNT = NBbytes[FrameInstanz.loopcnt-1];
-   // Start transmitting I2S data
    NRF_I2S->TASKS_START = 1;
 
 
@@ -79,7 +110,6 @@ int main(void)
    // The TXD pointer can be updated after the EVENTS_TXPTRUPD arrives.
    while (1)
    {
-
     __WFE();
     while (len>FrameInstanz.loopcnt)
     {
@@ -92,7 +122,7 @@ int main(void)
        if(newFrame)
        {
           getPcm(&FrameInstanz);
-          printf("pcm:%o", OpusInstanz.pcm_bytes[0]);
+          //printf("pcm:%o", OpusInstanz.pcm_bytes[0]);
        }
        /* New I2S buffer*/
        if(NRF_I2S->EVENTS_TXPTRUPD  != 0)

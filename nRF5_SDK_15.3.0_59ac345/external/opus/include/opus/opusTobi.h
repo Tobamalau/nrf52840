@@ -15,7 +15,7 @@
 #define MAX_PACKET_SIZE (3*1276)
 #define SAMPLE_RATE 48000
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 extern int NBbytes[];
 
