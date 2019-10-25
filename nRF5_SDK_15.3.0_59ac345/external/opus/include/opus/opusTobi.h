@@ -8,12 +8,12 @@
 
 #define FRAME_SIZE 960
 #define APPLICATION OPUS_APPLICATION_AUDIO
-#define BITRATE 64000
+//#define BITRATE 64000
 #define NBBYTES 249
 #define OPUSCHANNELS 1
 #define MAX_FRAME_SIZE (6*960)
 #define MAX_PACKET_SIZE (3*1276)
-#define SAMPLE_RATE 48000
+#define SAMPLE_RATE 8000   //input Sample Rate of opus file
 
 #define VERBOSE 0
 
@@ -31,10 +31,12 @@ struct frame {
    struct opus *opus_t;
    uint_fast16_t loopcnt;
    uint_fast16_t nbbytessum;
+   uint16_t nbbytescnt;
 };
 
 int_fast8_t decodeOpusFrame(struct opus *opus_t);
 int initOpus(struct opus *opus_t);
+int initOpusFrame(struct frame *frame_t);
 void getPcm(struct frame *frame_t);
 
 #endif

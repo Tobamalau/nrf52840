@@ -94,7 +94,8 @@
       build_quietly="No"
       build_toolchain_directory="$(StudioDir)/gcc/$(GCCTarget)/bin"
       c_user_include_directories="$(HomeDir)/src/nrf52840-DK/external/opus/include/opus\;../../../../../../external/opus/include/opus\;."
-      linker_additional_files="$../../../../../../external/opus/lib" />
+      link_include_standard_libraries="Yes"
+      linker_additional_files="$../../../../../../external/opus/lib\;/opt/gcc-arm-none-eabi-8-2019-q3-update/arm-none-eabi/lib/libc.a\;/opt/gcc-arm-none-eabi-8-2019-q3-update/arm-none-eabi/lib/libstdc++.a" />
   </project>
   <configuration
     Name="Release"

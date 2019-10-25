@@ -21,9 +21,9 @@ void initI2S()
    // Enable MCK generator
    NRF_I2S->CONFIG.MCKEN = (I2S_CONFIG_MCKEN_MCKEN_ENABLE << I2S_CONFIG_MCKEN_MCKEN_Pos);
    // MCKFREQ
-   NRF_I2S->CONFIG.MCKFREQ = I2S_CONFIG_MCKFREQ_MCKFREQ_32MDIV21  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
+   NRF_I2S->CONFIG.MCKFREQ = I2S_CONFIG_MCKFREQ_MCKFREQ_32MDIV23  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
    // Ratio = 96
-   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_64X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
+   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_32X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
    // Master mode, 16Bit, left aligned
    NRF_I2S->CONFIG.MODE = I2S_CONFIG_MODE_MODE_MASTER << I2S_CONFIG_MODE_MODE_Pos;
    NRF_I2S->CONFIG.SWIDTH = I2S_CONFIG_SWIDTH_SWIDTH_16BIT << I2S_CONFIG_SWIDTH_SWIDTH_Pos;
@@ -86,18 +86,13 @@ int main(void)
    printf("\n\nUart Init:%ld\n", err_t);
    initI2S();
 
-/*
-   uint_fast16_t loopcnt = 0;
-   uint_fast16_t nbbytessum = 0;
-   uint_fast16_t len = sizeof(NBbytes) / sizeof(NBbytes[0]);
-   initOpus(&OpusInstanz);
-   FrameInstanz.opus_t = &OpusInstanz;
-  */
-   uint_fast16_t len = 57;
+
+   //uint_fast16_t len = 57;
    volatile uint_fast8_t newFrame = 0;
    struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
-   initOpus(&OpusInstanz);
+   initOpusFrame(&FrameInstanz);
+   //initOpus(&OpusInstanz);
    printf("Opus Init\n");
 
    getPcm(&FrameInstanz);
@@ -111,14 +106,9 @@ int main(void)
    while (1)
    {
     __WFE();
-    while (len>FrameInstanz.loopcnt)
+    while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
     {
-       /*
-       OpusInstanz.input = marioTestenc_opus + nbbytessum;
-       OpusInstanz.nbBytes = NBbytes[loopcnt];
-       decodeOpusFrame(&OpusInstanz);
-       nbbytessum += OpusInstanz.nbBytes;
-       loopcnt++;*/
+
        if(newFrame)
        {
           getPcm(&FrameInstanz);
