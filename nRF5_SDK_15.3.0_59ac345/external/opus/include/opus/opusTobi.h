@@ -15,7 +15,7 @@
 #define MAX_PACKET_SIZE (3*1276)
 #define SAMPLE_RATE 8000   //input Sample Rate of opus file
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 extern int NBbytes[];
 

@@ -22,15 +22,15 @@ int_fast8_t decodeOpusFrame(struct opus *opus_t)
    }
    opus_int32 rate;
    opus_decoder_ctl(opus_t->decoder, OPUS_GET_BITRATE(&rate));
-   printf("\nOPUS_GET_BITRATE:%ld ", rate);
+   //printf("\nOPUS_GET_BITRATE:%ld ", rate);
    /* Convert to little-endian ordering.*/
    for(int i=0;i<OPUSCHANNELS*frame_size;i++)
    {
       opus_t->pcm_bytes[2*i]=opus_t->out[i]&0xFF;
       opus_t->pcm_bytes[2*i+1]=(opus_t->out[i]>>8)&0xFF;
 #if VERBOSE
-      printf("%o\t%o\t",opus_t->pcm_bytes[2*i], opus_t->pcm_bytes[2*i+1]);
-      if(i%10 == 0)
+      printf("%o,%o,%d",opus_t->pcm_bytes[2*i], opus_t->pcm_bytes[2*i+1], frame_size);
+      if(i%50 == 0)
          printf("\n");
 #endif
    }
