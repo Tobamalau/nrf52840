@@ -1,14 +1,22 @@
 #include <stdio.h>
 #include <nrf.h>
+
 #include "sdk_config.h"
 //#include "sound.h"
 #include "opus.h"
 //#include "opusFile.c"
 #include "opusTobi.h"
 
+#include "nrf_delay.h"
+#include "app_util_platform.h"
+#include "app_error.h"
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
+#include "nrf_log_default_backends.h"
+
 /*Anfang Uart Init*/
 #include "boards.h"
-#include "app_uart.h"
+//#include "app_uart.h"
 #define UART_TX_BUF_SIZE                256                                         /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
 /*Ende Uart Init*/
@@ -43,15 +51,15 @@ void initI2S()
    NRF_I2S->ENABLE = 1;
 }
 
-/**@snippet [Handling the data received over UART] */
+/**@snippet [Handling the data received over UART] 
 void uart_event_handle(app_uart_evt_t * p_event)
 {
 	// Look at the UART example.
-}
+}*/
 
 /**@brief  Function for initializing the UART module.
  */
-/**@snippet [UART Initialization] */
+/**@snippet [UART Initialization] 
 static uint32_t uart_init(void)
 {
     uint32_t                     err_code;
@@ -73,14 +81,19 @@ static uint32_t uart_init(void)
                        err_code);
     return err_code;
     //APP_ERROR_CHECK(err_code);
-}
+}*/
 
 int main(void)
 {
-   uint32_t err_t;
+    NRF_LOG_INIT(NULL);
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+
+    NRF_LOG_INFO("I2S loopback example started.");
+
+   /*uint32_t err_t;
    err_t = uart_init();
 
-   printf("\n\nUart Init:%ld\n", err_t);
+   printf("\n\nUart Init:%ld\n", err_t);*/
    initI2S();
 
 
@@ -108,10 +121,10 @@ int main(void)
    // The TXD pointer can be updated after the EVENTS_TXPTRUPD arrives.
    while (1)
    {
+	NRF_LOG_FLUSH();
     //__WFE();
     while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
     {
-
        if(newFrame)
        {
           getPcm(&FrameInstanz);
@@ -124,9 +137,10 @@ int main(void)
            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes;
            NRF_I2S->RXTXD.MAXCNT = 160;
            NRF_I2S->EVENTS_TXPTRUPD = 0;
-           newFrame = 1;
+           //newFrame = 1;
            //printf("\nnewFrame");
        }
+NRF_LOG_FLUSH();
     }
     FrameInstanz.loopcnt = 0;
     FrameInstanz.nbbytessum = 0;

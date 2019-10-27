@@ -29,8 +29,8 @@ int_fast8_t decodeOpusFrame(struct opus *opus_t)
       opus_t->pcm_bytes[2*i]=opus_t->out[i]&0xFF;
       opus_t->pcm_bytes[2*i+1]=(opus_t->out[i]>>8)&0xFF;
 #if VERBOSE
-      printf("%o,%o,%d",opus_t->pcm_bytes[2*i], opus_t->pcm_bytes[2*i+1], frame_size);
-      if(i%50 == 0)
+      printf("0x%x,0x%x\t",opus_t->pcm_bytes[2*i], opus_t->pcm_bytes[2*i+1]);
+      if(i%25 == 0)
          printf("\n");
 #endif
    }
