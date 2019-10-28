@@ -16,8 +16,8 @@
 
 /*Anfang Uart Init*/
 #include "boards.h"
-//#include "app_uart.h"
-#define UART_TX_BUF_SIZE                256                                         /**< UART TX buffer size. */
+#include "app_uart.h"
+#define UART_TX_BUF_SIZE                1024                                         /**< UART TX buffer size. */
 #define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
 /*Ende Uart Init*/
 
@@ -59,7 +59,7 @@ void uart_event_handle(app_uart_evt_t * p_event)
 
 /**@brief  Function for initializing the UART module.
  */
-/**@snippet [UART Initialization] 
+/**@snippet [UART Initialization] */
 static uint32_t uart_init(void)
 {
     uint32_t                     err_code;
@@ -77,70 +77,72 @@ static uint32_t uart_init(void)
                        UART_RX_BUF_SIZE,
                        UART_TX_BUF_SIZE,
                        uart_event_handle,
-                       APP_IRQ_PRIORITY_LOWEST,
+                       APP_IRQ_PRIORITY_MID,
                        err_code);
     return err_code;
     //APP_ERROR_CHECK(err_code);
-}*/
+}
 
 int main(void)
 {
-    NRF_LOG_INIT(NULL);
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-
-    NRF_LOG_INFO("I2S loopback example started.");
-
-   /*uint32_t err_t;
+   uint32_t err_t;
    err_t = uart_init();
+   
 
-   printf("\n\nUart Init:%ld\n", err_t);*/
+   printf("\n\nUart Init:%ld\n", err_t);
    initI2S();
 
 
    //uint_fast16_t len = 57;
-   volatile uint_fast8_t newFrame = 0;
+   volatile uint8_t newFrame = 1;
+   volatile uint8_t bufferNr = 0;
    struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
    initOpusFrame(&FrameInstanz);
-   //initOpus(&OpusInstanz);
-   printf("Opus Init\n");
+ 
+   printf("Opus                Init\n");
 
-   getPcm(&FrameInstanz);
+   getPcm(&FrameInstanz, bufferNr);
+   //int test =  sizeof(sine_table) / sizeof(uint32_t);
 
-
-  NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes;
-  NRF_I2S->RXTXD.MAXCNT = 160;//NBbytes[FrameInstanz.loopcnt-1];
+  NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
+  //NRF_I2S->RXTXD.MAXCNT = 960;//NBbytes[FrameInstanz.loopcnt-1];
+  NRF_I2S->RXTXD.MAXCNT = sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
   NRF_I2S->TASKS_START = 1;
+  bufferNr ^= (1 << 0);
    /*
      NRF_I2S->TXD.PTR = (uint32_t)&sine_table[0];
   NRF_I2S->RXTXD.MAXCNT = sizeof(sine_table) / sizeof(uint32_t);
    NRF_I2S->TASKS_START = 1;
 */
+  
 
    // Since we are not updating the TXD pointer, the sine wave will play over and over again.
    // The TXD pointer can be updated after the EVENTS_TXPTRUPD arrives.
+   
    while (1)
    {
-	NRF_LOG_FLUSH();
-    //__WFE();
-    while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
+
+    __WFE();
+    //while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
+    while (4>FrameInstanz.loopcnt)
     {
        if(newFrame)
        {
-          getPcm(&FrameInstanz);
-          newFrame = 1;
-          //printf("pcm:%o", OpusInstanz.pcm_bytes[0]);
+          //printf("\ngetPcm bufferNr:%d", bufferNr);
+          getPcm(&FrameInstanz, bufferNr);
+          newFrame = 0;
        }
        /* New I2S buffer*/
        if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
        {
-           NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes;
-           NRF_I2S->RXTXD.MAXCNT = 160;
+           //printf("\nEVENT bufferNr:%d\n", bufferNr);
+           NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
+           NRF_I2S->RXTXD.MAXCNT = sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
            NRF_I2S->EVENTS_TXPTRUPD = 0;
-           //newFrame = 1;
-           //printf("\nnewFrame");
+           newFrame = 1;
+           bufferNr ^= (1 << 0);
        }
-NRF_LOG_FLUSH();
     }
     FrameInstanz.loopcnt = 0;
     FrameInstanz.nbbytessum = 0;

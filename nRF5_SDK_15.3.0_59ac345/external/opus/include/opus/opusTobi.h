@@ -24,7 +24,7 @@ struct opus {
    int nbBytes;
    const unsigned char *input;
    opus_int16 out[MAX_FRAME_SIZE*OPUSCHANNELS];
-   unsigned char pcm_bytes[MAX_FRAME_SIZE*OPUSCHANNELS*2];
+   unsigned char pcm_bytes[2][MAX_FRAME_SIZE*OPUSCHANNELS*2];
 };
 
 struct frame {
@@ -34,9 +34,9 @@ struct frame {
    uint16_t nbbytescnt;
 };
 
-int_fast8_t decodeOpusFrame(struct opus *opus_t);
+int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr);
 int initOpus(struct opus *opus_t);
 int initOpusFrame(struct frame *frame_t);
-void getPcm(struct frame *frame_t);
+void getPcm(struct frame *frame_t, uint8_t bufferNr);
 
 #endif
