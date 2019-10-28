@@ -24,6 +24,8 @@
 /nRF5_SDK_15.3.0_59ac345/examples/peripheral/*
 !/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sTobi
 
+
+/nRF-IEEE-802.15.4-radio-driver/
 /nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/
 /nRF5_SDK_15.3.0_59ac345/
 /nRF5_SDK_15.0.0_a53641a/

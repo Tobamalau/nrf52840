@@ -51,11 +51,11 @@ void initI2S()
    NRF_I2S->ENABLE = 1;
 }
 
-/**@snippet [Handling the data received over UART] 
+/**@snippet [Handling the data received over UART] */
 void uart_event_handle(app_uart_evt_t * p_event)
 {
 	// Look at the UART example.
-}*/
+}
 
 /**@brief  Function for initializing the UART module.
  */
