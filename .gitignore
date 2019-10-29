@@ -24,10 +24,21 @@
 /nRF5_SDK_15.3.0_59ac345/examples/peripheral/*
 !/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sTobi
 
+# Thead
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/components/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/config/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/documentation/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/external/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/external_tools/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/integration/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/modules/*
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/*
+!nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/
+nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/*
+!nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/cliTobi
 
 /openthread/
 /nRF-IEEE-802.15.4-radio-driver/
-/nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/
 /nRF5_SDK_15.3.0_59ac345/
 /nRF5_SDK_15.0.0_a53641a/
 /nRF52ExtendedAdvertisementsBluetooth5/*
@@ -41,6 +52,8 @@ nrf51-ble-tutorial-advertising/
 *.pdf
 *.bin
 *.emSession
+*.xml
+*.msi
 
 # Prerequisites
 *.d
@@ -55,6 +68,7 @@ nrf51-ble-tutorial-advertising/
 *.ilk
 *.map
 *.exp
+*.ld
 
 # Precompiled Headers
 *.gch
