@@ -1,11 +1,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "nrf_802154_config.h"
 #include "nrf_802154.h"
 
 
-#define MAX_MESSAGE_SIZE 16
+#define MAX_MESSAGE_SIZE 63
 #define CHANNEL          11
 
 static volatile bool m_tx_in_progress;
@@ -25,6 +26,19 @@ int main(int argc, char *argv[])
 
     message[0] = 0x41;                // Set MAC header: short addresses, no ACK
     message[1] = 0x98;                // Set MAC header
+    for(int i=2;i<MAX_MESSAGE_SIZE;i++)
+    {
+      char buffer [2];
+      itoa(i, buffer, 10);
+      if(i<10)
+        message[i] = buffer[0];
+      else
+      {
+        message[i] = buffer[1];
+      }
+    }
+
+
 
     m_tx_in_progress = false;
     m_tx_done        = false;
@@ -50,10 +64,10 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void nrf_802154_transmitted(const uint8_t * p_frame, uint8_t * p_ack, uint8_t length, int8_t power, int8_t lqi)
+
+void nrf_802154_transmitted_raw(const uint8_t * p_frame, uint8_t * p_ack, int8_t power, uint8_t lqi)
 {
     (void) p_frame;
-    (void) length;
     (void) power;
     (void) lqi;
 
