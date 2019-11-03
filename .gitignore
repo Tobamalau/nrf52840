@@ -36,6 +36,8 @@ nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/*
 !nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/
 nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/*
 !nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/cliTobi
+!nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/cli
+
 
 
 /wpantund/
