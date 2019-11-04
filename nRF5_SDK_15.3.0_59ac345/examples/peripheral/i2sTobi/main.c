@@ -107,7 +107,7 @@ int main(void)
 
   NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
   //NRF_I2S->RXTXD.MAXCNT = 960;//NBbytes[FrameInstanz.loopcnt-1];
-  NRF_I2S->RXTXD.MAXCNT = sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+  NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
   NRF_I2S->TASKS_START = 1;
   bufferNr ^= (1 << 0);
    /*
@@ -124,8 +124,8 @@ int main(void)
    {
 
     __WFE();
-    //while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
-    while (4>FrameInstanz.loopcnt)
+    while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
+    //while (4>FrameInstanz.loopcnt)
     {
        if(newFrame)
        {
@@ -138,7 +138,7 @@ int main(void)
        {
            //printf("\nEVENT bufferNr:%d\n", bufferNr);
            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
-           NRF_I2S->RXTXD.MAXCNT = sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+           NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
            NRF_I2S->EVENTS_TXPTRUPD = 0;
            newFrame = 1;
            bufferNr ^= (1 << 0);

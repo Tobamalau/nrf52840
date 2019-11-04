@@ -24,7 +24,7 @@ struct opus {
    int nbBytes;
    const unsigned char *input;
    opus_int16 out[MAX_FRAME_SIZE*OPUSCHANNELS];
-   unsigned char pcm_bytes[2][MAX_FRAME_SIZE*OPUSCHANNELS*2];
+   int16_t pcm_bytes[2][MAX_FRAME_SIZE*OPUSCHANNELS*2];
 };
 
 struct frame {

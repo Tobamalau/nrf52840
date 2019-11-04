@@ -12,7 +12,7 @@ int NBbytes[] = {249,134,135,258,189,161,161,161,161,161,161,161,161,161,161,161
 */
 int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
 {
-   memset(opus_t->pcm_bytes, '\0', sizeof(opus_t->pcm_bytes));
+   //memset(&opus_t->pcm_bytes[bufferNr], '\0', sizeof(opus_t->pcm_bytes[bufferNr]));
    //getopus_decoder_ctl(opus_t->decoder, OPUS_SET_BITRATE(10630));
    int frame_size = opus_decode(opus_t->decoder, opus_t->input, opus_t->nbBytes, opus_t->out, MAX_FRAME_SIZE, 0);
    if (frame_size<0)
@@ -24,14 +24,23 @@ int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
    opus_decoder_ctl(opus_t->decoder, OPUS_GET_BITRATE(&rate));
    //printf("\nOPUS_GET_BITRATE:%ld ", rate);
    /* Convert to little-endian ordering.*/
-   #if VERBOSE
+#if VERBOSE
    printf("\nframe_size:%d, bufferNr:%d\n", frame_size, bufferNr);
    int printcnr = 0;
-   #endif
+#endif
    for(int i=0;i<OPUSCHANNELS*frame_size;i++)
    {
-      opus_t->pcm_bytes[bufferNr][2*i]=opus_t->out[i]&0xFF;
-      opus_t->pcm_bytes[bufferNr][2*i+1]=(opus_t->out[i]>>8)&0xFF;
+#if 0
+      int16_t a = ((opus_t->out[i]&0xFF)<<8) | ((opus_t->out[i]>>8)&0xFF);
+      if (bufferNr) {
+        a= 0x00aa;
+      } else {
+        a=0xff00;
+      }
+#endif
+      //opus_t->pcm_bytes[bufferNr][i] = a;
+      opus_t->pcm_bytes[bufferNr][i]=opus_t->out[i];
+      //opus_t->pcm_bytes[bufferNr][2*i+1]=(opus_t->out[i]>>8)&0xFF;
 #if VERBOSE
       if(i<128 && i > 16*7+12)
       {
