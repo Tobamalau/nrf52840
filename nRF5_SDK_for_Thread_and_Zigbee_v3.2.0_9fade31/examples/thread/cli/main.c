@@ -60,7 +60,7 @@
 #define SCHED_QUEUE_SIZE      32                              /**< Maximum number of events in the scheduler queue. */
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
 
-
+#define THREAD_CONFIG 1
 
 
 /***************************************************************************************************
@@ -186,6 +186,7 @@ static void scheduler_init(void)
 
 int main(int argc, char *argv[])
 {
+#if 1
     log_init();
     scheduler_init();
     timer_init();
@@ -194,15 +195,25 @@ int main(int argc, char *argv[])
     uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
     APP_ERROR_CHECK(err_code);
 
-    initUdp(thread_ot_instance_get());
+#endif    
 
     while (true)
     {
-        thread_instance_init();
+#if THREAD_CONFIG
+    thread_init_Tobi(thread_state_changed_callback);
+#else
+    thread_instance_init();
+    initUdp(thread_ot_instance_get());
+#endif
+
+        
+        
 
         while (!thread_soft_reset_was_requested())
         {
+#if 1
             thread_process();
+#endif
             app_sched_execute();
 
             if (NRF_LOG_PROCESS() == false)
