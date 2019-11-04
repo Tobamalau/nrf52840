@@ -60,6 +60,9 @@
 #define SCHED_QUEUE_SIZE      32                              /**< Maximum number of events in the scheduler queue. */
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
 
+
+
+
 /***************************************************************************************************
  * @section Callbacks
  **************************************************************************************************/
@@ -77,6 +80,7 @@ static void bsp_event_handler(bsp_event_t event)
     {
         case BSP_EVENT_KEY_0:
             NRF_LOG_INFO("Button 1 pressed");
+            sendUdp(thread_ot_instance_get());
             break;
 
         case BSP_EVENT_KEY_1:
@@ -190,6 +194,8 @@ int main(int argc, char *argv[])
     uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
     APP_ERROR_CHECK(err_code);
 
+    initUdp(thread_ot_instance_get());
+
     while (true)
     {
         thread_instance_init();
@@ -208,7 +214,3 @@ int main(int argc, char *argv[])
         thread_instance_finalize();
     }
 }
-
-/**
- *@}
- **/
