@@ -30,21 +30,11 @@ int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
 #endif
    for(int i=0;i<OPUSCHANNELS*frame_size;i++)
    {
-#if 0
-      int16_t a = ((opus_t->out[i]&0xFF)<<8) | ((opus_t->out[i]>>8)&0xFF);
-      if (bufferNr) {
-        a= 0x00aa;
-      } else {
-        a=0xff00;
-      }
-#endif
-      //opus_t->pcm_bytes[bufferNr][i] = a;
-      opus_t->pcm_bytes[bufferNr][i]=opus_t->out[i];
-      //opus_t->pcm_bytes[bufferNr][2*i+1]=(opus_t->out[i]>>8)&0xFF;
+      opus_t->pcm_bytes[bufferNr][i]=opus_t->out[i];    //Array pcm Bytes kann noch wegrationalisiert werden
 #if VERBOSE
       if(i<128 && i > 16*7+12)
       {
-        printf("%x,%x\t",opus_t->pcm_bytes[bufferNr][2*i], opus_t->pcm_bytes[bufferNr][2*i+1]);
+        printf("%x,%x\t",opus_t->pcm_bytes[bufferNr][i], opus_t->pcm_bytes[bufferNr][i+1]);
         if(printcnr%7 == 0 && printcnr!= 0)
         {
           printf("\n");
