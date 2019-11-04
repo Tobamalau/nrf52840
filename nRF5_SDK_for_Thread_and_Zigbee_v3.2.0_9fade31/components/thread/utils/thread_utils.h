@@ -79,7 +79,7 @@ typedef struct
  *
  */
 void thread_init(const thread_configuration_t * p_config);
-
+void thread_init_Tobi(otStateChangedCallback handler);
 
 /**@brief Function for deinitializing the Thread Stack. */
 void thread_deinit(void);
@@ -145,5 +145,9 @@ void sendUdp(otInstance *aInstance);
  */
 void handleUdpReceive(void *aContext, otMessage *aMessage,
                       const otMessageInfo *aMessageInfo);
+/**
+ * Override default network settings, such as panid, so the devices can join a network
+ */
+void setNetworkConfiguration(otInstance *aInstance);
 
 #endif /* THREAD_UTILS_H__ */

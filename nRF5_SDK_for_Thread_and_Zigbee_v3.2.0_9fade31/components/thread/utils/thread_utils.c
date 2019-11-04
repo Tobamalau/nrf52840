@@ -46,6 +46,7 @@
 #include "nrf_pwr_mgmt.h"
 #include "nrf_soc.h"
 #include "sdk_config.h"
+#include <assert.h>
 
 #if defined(MULTIPROTOCOL_802154_CONFIG_PRESENT)
 #include "multiprotocol_802154_config.h"
@@ -64,6 +65,7 @@
 #include <openthread/code_utils.h>
 
 #define UDP_PORT 1212
+#define THREAD_CONFIG 1
 
 static const char UDP_DEST_ADDR[] = "ff03::1";
 static const char UDP_PAYLOAD[]   = "Hello OpenThread World!";
@@ -75,6 +77,36 @@ static otInstance * mp_ot_instance;
 static otUdpSocket sUdpSocket;
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
                       const otMessageInfo *aMessageInfo);
+
+
+void thread_init_Tobi(otStateChangedCallback handler)
+{
+    otError error;
+    otSysInit(NULL, NULL);
+
+    mp_ot_instance = otInstanceInitSingle();
+    ASSERT(mp_ot_instance != NULL);
+
+    NRF_LOG_INFO("Thread version: %s", (uint32_t)otGetVersionString());
+    NRF_LOG_INFO("Network name:   %s",
+                 (uint32_t)otThreadGetNetworkName(mp_ot_instance));
+    otCliUartInit(mp_ot_instance);
+    thread_state_changed_callback_set(handler);
+    setNetworkConfiguration(mp_ot_instance);
+
+    error = otIp6SetEnabled(mp_ot_instance, true); /* Start the Thread network interface (CLI cmd > ifconfig up) */
+    ASSERT(error == OT_ERROR_NONE);
+            error = otThreadSetEnabled(mp_ot_instance, true); /* Start the Thread stack (CLI cmd > thread start) */
+    ASSERT(error == OT_ERROR_NONE);
+
+    NRF_LOG_INFO("Thread interface has been enabled.");
+    NRF_LOG_INFO("802.15.4 Channel : %d", otLinkGetChannel(mp_ot_instance));
+    NRF_LOG_INFO("802.15.4 PAN ID  : 0x%04x", otLinkGetPanId(mp_ot_instance));
+    NRF_LOG_INFO("Radio mode:      : %s", otThreadGetLinkMode(mp_ot_instance).mRxOnWhenIdle ?
+                                    "rx-on-when-idle" : "rx-off-when-idle");
+
+    initUdp(mp_ot_instance);
+}
 
 void thread_init(const thread_configuration_t * p_config)
 {
@@ -273,6 +305,7 @@ bool thread_soft_reset_was_requested(void)
  */
 void initUdp(otInstance *aInstance)
 {
+    otError       error = OT_ERROR_NONE;
     otSockAddr  listenSockAddr;
 
     memset(&sUdpSocket, 0, sizeof(sUdpSocket));
@@ -281,8 +314,11 @@ void initUdp(otInstance *aInstance)
     listenSockAddr.mPort    = UDP_PORT;
    // listenSockAddr.mScopeId = OT_NETIF_INTERFACE_ID_THREAD;
 
-    otUdpOpen(aInstance, &sUdpSocket, handleUdpReceive, aInstance);
-    otUdpBind(&sUdpSocket, &listenSockAddr);
+    error = otUdpOpen(aInstance, &sUdpSocket, handleUdpReceive, aInstance);
+    NRF_LOG_INFO("otUdpOpen: %d", error);
+    error = otUdpBind(&sUdpSocket, &listenSockAddr);
+    NRF_LOG_INFO("otUdpBind: %d", error);
+
 }
 
 /**
@@ -300,7 +336,7 @@ void sendUdp(otInstance *aInstance)
     otIp6AddressFromString(UDP_DEST_ADDR, &destinationAddr);
     messageInfo.mPeerAddr    = destinationAddr;
     messageInfo.mPeerPort    = UDP_PORT;
-   // messageInfo.mInterfaceId = OT_NETIF_INTERFACE_ID_THREAD;
+    messageInfo.mInterfaceId = OT_NETIF_INTERFACE_ID_THREAD;  //Neccesary for this version of thread in newer version it's not needed
 
     message = otUdpNewMessage(aInstance, NULL);
     otEXPECT_ACTION(message != NULL, error = OT_ERROR_NO_BUFS);
@@ -326,7 +362,64 @@ void handleUdpReceive(void *aContext, otMessage *aMessage,
     OT_UNUSED_VARIABLE(aContext);
     OT_UNUSED_VARIABLE(aMessage);
     OT_UNUSED_VARIABLE(aMessageInfo);
-
-    //otSysLedToggle(4);
+    NRF_LOG_INFO("UDP Message recived");
+    
 }
+
+
+/**
+ * Override default network settings, such as panid, so the devices can join a network
+ */
+void setNetworkConfiguration(otInstance *aInstance)
+{
+    static char          aNetworkName[] = "OTCodelab";
+    otOperationalDataset aDataset;
+
+    memset(&aDataset, 0, sizeof(otOperationalDataset));
+   
+    /*
+     * Fields that can be configured in otOperationDataset to override defaults:
+     *     Network Name, Mesh Local Prefix, Extended PAN ID, PAN ID, Delay Timer,
+     *     Channel, Channel Mask Page 0, Network Master Key, PSKc, Security Policy
+     */
+    aDataset.mActiveTimestamp                      = 1;
+    aDataset.mComponents.mIsActiveTimestampPresent = true;
+     
+    /* Set Channel to 15 */
+    aDataset.mChannel                      = 15;
+    aDataset.mComponents.mIsChannelPresent = true;
+    
+    /* Set Pan ID to 2222 */
+    aDataset.mPanId                      = (otPanId)0x2222;
+    aDataset.mComponents.mIsPanIdPresent = true;
+
+    /* Set Extended Pan ID to C0DE1AB5C0DE1AB5 */
+    uint8_t extPanId[OT_EXT_PAN_ID_SIZE] = {0xC0, 0xDE, 0x1A, 0xB5, 0xC0, 0xDE, 0x1A, 0xB5};
+    memcpy(aDataset.mExtendedPanId.m8, extPanId, sizeof(aDataset.mExtendedPanId));
+    aDataset.mComponents.mIsExtendedPanIdPresent = true;
+    
+    /* Set master key to 1234C0DE1AB51234C0DE1AB51234C0DE */
+    uint8_t key[OT_MASTER_KEY_SIZE] = {0x12, 0x34, 0xC0, 0xDE, 0x1A, 0xB5, 0x12, 0x34, 0xC0, 0xDE, 0x1A, 0xB5};
+    memcpy(aDataset.mMasterKey.m8, key, sizeof(aDataset.mMasterKey));
+    aDataset.mComponents.mIsMasterKeyPresent = true;
+
+    /* Set Network Name to OTCodelab */
+    size_t length = strlen(aNetworkName);
+    assert(length <= OT_NETWORK_NAME_MAX_SIZE);
+    memcpy(aDataset.mNetworkName.m8, aNetworkName, length);
+    aDataset.mComponents.mIsNetworkNamePresent = true;
+
+#if OPENTHREAD_FTD
+    otDatasetSetActive(aInstance, &aDataset);
+    
+    /* Set the router selection jitter to override the 2 minute default.
+       CLI cmd > routerselectionjitter 20
+       Warning: For demo purposes only - not to be used in a real product */
+    uint8_t jitterValue = 20;
+    otThreadSetRouterSelectionJitter(aInstance, jitterValue);
+#else
+    OT_UNUSED_VARIABLE(aInstance);
+#endif
+}
+
 
