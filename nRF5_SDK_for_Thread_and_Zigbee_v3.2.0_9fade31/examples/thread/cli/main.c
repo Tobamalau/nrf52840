@@ -63,6 +63,11 @@
 
 #define THREAD_CONFIG 1
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
+static const unsigned char UDP_REQUEST[]   = "r";
+
+int16_t Nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
+int16_t sendLoopCnt = 0;
+uint32_t Nbbytessum = 0;
 
 
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
@@ -93,12 +98,12 @@ static void bsp_event_handler(bsp_event_t event)
             break;
 
         case BSP_EVENT_KEY_2:
-            NRF_LOG_INFO("Button 3 pressed");
-            sendUdp(thread_ot_instance_get(), opusData, NBbytes[2]);
+            NRF_LOG_INFO("Button 3 (UDP_REQUEST) pressed");
+            sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
             break;
 
         case BSP_EVENT_KEY_3:
-            NRF_LOG_INFO("Button 4 pressed");
+            NRF_LOG_INFO("Button 4 (send all) pressed");
             int16_t nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
             uint32_t nbbytessum = 0;
             const unsigned char *input = opusData;
@@ -106,7 +111,11 @@ static void bsp_event_handler(bsp_event_t event)
             for(i ; i<nbbytescnt; i++)
             {
               sendUdp(thread_ot_instance_get(), input, NBbytes[i]);
-              nbbytessum += NBbytes[0];
+              /*while(!otLinkIsInTransmitState(thread_ot_instance_get())){
+                  NRF_LOG_INFO("otLinkIsInTransmitState");
+                  __WFE();
+              }*/
+              nbbytessum += NBbytes[i];
               input = opusData + nbbytessum;
             }
             NRF_LOG_INFO("%d mal UDP send", i);
@@ -127,7 +136,17 @@ void handleUdpReceive(void *aContext, otMessage *aMessage,
     otMessageRead(aMessage, otMessageGetOffset(aMessage), messageBuffer, otMessageGetLength(aMessage));
     NRF_LOG_INFO("UDP Message recived:%s", messageBuffer);
     bsp_board_led_invert(1);
-    
+    if(messageBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)
+    {
+      const unsigned char *input;
+      if(sendLoopCnt>=Nbbytescnt)
+        sendLoopCnt = 0;
+
+      input = opusData + Nbbytessum;
+      sendUdp(thread_ot_instance_get(), input, NBbytes[sendLoopCnt]);
+      Nbbytessum += NBbytes[sendLoopCnt];
+      sendLoopCnt++;     
+    }   
 }
 
 /***************************************************************************************************
