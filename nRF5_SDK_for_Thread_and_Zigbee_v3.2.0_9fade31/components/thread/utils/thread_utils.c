@@ -75,8 +75,8 @@ static const char UDP_PAYLOAD[]   = "Hello OpenThread World!";
 static otInstance * mp_ot_instance;
 
 static otUdpSocket sUdpSocket;
-void handleUdpReceive(void *aContext, otMessage *aMessage, 
-                      const otMessageInfo *aMessageInfo);
+//void handleUdpReceive(void *aContext, otMessage *aMessage, 
+//                      const otMessageInfo *aMessageInfo);
 
 
 void thread_init_Tobi(otStateChangedCallback handler)
@@ -105,7 +105,7 @@ void thread_init_Tobi(otStateChangedCallback handler)
     NRF_LOG_INFO("Radio mode:      : %s", otThreadGetLinkMode(mp_ot_instance).mRxOnWhenIdle ?
                                     "rx-on-when-idle" : "rx-off-when-idle");
 
-    initUdp(mp_ot_instance);
+    
 }
 
 void thread_init(const thread_configuration_t * p_config)
@@ -303,7 +303,7 @@ bool thread_soft_reset_was_requested(void)
 /**
  * Initialize UDP socket
  */
-void initUdp(otInstance *aInstance)
+void initUdp(otInstance *aInstance, otUdpReceive reciveHandler)
 {
     otError       error = OT_ERROR_NONE;
     otSockAddr  listenSockAddr;
@@ -314,7 +314,9 @@ void initUdp(otInstance *aInstance)
     listenSockAddr.mPort    = UDP_PORT;
    // listenSockAddr.mScopeId = OT_NETIF_INTERFACE_ID_THREAD;
 
-    error = otUdpOpen(aInstance, &sUdpSocket, handleUdpReceive, aInstance);
+    //error = otUdpOpen(aInstance, &sUdpSocket, handleUdpReceive, aInstance);
+    error = otUdpOpen(aInstance, &sUdpSocket, reciveHandler, aInstance);
+    
     NRF_LOG_INFO("otUdpOpen: %d", error);
     error = otUdpBind(&sUdpSocket, &listenSockAddr);
     NRF_LOG_INFO("otUdpBind: %d", error);
@@ -344,7 +346,8 @@ void sendUdp(otInstance *aInstance)
     error = otMessageAppend(message, UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
     otEXPECT(error == OT_ERROR_NONE);
 
-    error = otUdpSend(&sUdpSocket, message, &messageInfo);
+    //error = otUdpSend(&sUdpSocket, message, &messageInfo);
+    error = otUdpSendDatagram(aInstance, message, &messageInfo);
 
  exit:
     if (error != OT_ERROR_NONE && message != NULL)
@@ -356,6 +359,7 @@ void sendUdp(otInstance *aInstance)
 /**
  * Function to handle UDP datagrams received on the listening socket
  */
+/*
 void handleUdpReceive(void *aContext, otMessage *aMessage,
                       const otMessageInfo *aMessageInfo)
 {
@@ -365,7 +369,7 @@ void handleUdpReceive(void *aContext, otMessage *aMessage,
     NRF_LOG_INFO("UDP Message recived");
     
 }
-
+*/
 
 /**
  * Override default network settings, such as panid, so the devices can join a network
@@ -384,7 +388,7 @@ void setNetworkConfiguration(otInstance *aInstance)
      */
     aDataset.mActiveTimestamp                      = 1;
     aDataset.mComponents.mIsActiveTimestampPresent = true;
-     
+    //aDataset.mSecurityPolicy 
     /* Set Channel to 15 */
     aDataset.mChannel                      = 15;
     aDataset.mComponents.mIsChannelPresent = true;
