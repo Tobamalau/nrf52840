@@ -68,7 +68,7 @@
 #define THREAD_CONFIG 1
 
 static const char UDP_DEST_ADDR[] = "ff03::1";
-static const char UDP_PAYLOAD[]   = "Hello OpenThread World!";
+
 
 
 /**@brief Pointer to the OpenThread instance. */
@@ -326,7 +326,7 @@ void initUdp(otInstance *aInstance, otUdpReceive reciveHandler)
 /**
  * Send a UDP datagram
  */
-void sendUdp(otInstance *aInstance)
+void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloadLength)
 {
     otError       error = OT_ERROR_NONE;
     otMessage *   message;
@@ -343,7 +343,7 @@ void sendUdp(otInstance *aInstance)
     message = otUdpNewMessage(aInstance, NULL);
     otEXPECT_ACTION(message != NULL, error = OT_ERROR_NO_BUFS);
 
-    error = otMessageAppend(message, UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
+    error = otMessageAppend(message, payload, payloadLength);
     otEXPECT(error == OT_ERROR_NONE);
 
     //error = otUdpSend(&sUdpSocket, message, &messageInfo);
@@ -352,6 +352,7 @@ void sendUdp(otInstance *aInstance)
  exit:
     if (error != OT_ERROR_NONE && message != NULL)
     {
+        NRF_LOG_INFO("Error: otUdpSendDatagram");
         otMessageFree(message);
     }
 }
@@ -406,6 +407,8 @@ void setNetworkConfiguration(otInstance *aInstance)
     uint8_t key[OT_MASTER_KEY_SIZE] = {0x12, 0x34, 0xC0, 0xDE, 0x1A, 0xB5, 0x12, 0x34, 0xC0, 0xDE, 0x1A, 0xB5};
     memcpy(aDataset.mMasterKey.m8, key, sizeof(aDataset.mMasterKey));
     aDataset.mComponents.mIsMasterKeyPresent = true;
+
+    aDataset.mComponents.mIsSecurityPolicyPresent = false;
 
     /* Set Network Name to OTCodelab */
     size_t length = strlen(aNetworkName);
