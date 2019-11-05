@@ -81,6 +81,7 @@ typedef struct
 void thread_init(const thread_configuration_t * p_config);
 void thread_init_Tobi(otStateChangedCallback handler);
 
+
 /**@brief Function for deinitializing the Thread Stack. */
 void thread_deinit(void);
 
@@ -133,7 +134,8 @@ bool thread_soft_reset_was_requested(void);
 /**
  * Initialize UDP socket
  */
-void initUdp(otInstance *aInstance);
+//void initUdp(otInstance *aInstance);
+void initUdp(otInstance *aInstance, otUdpReceive reciveHandler);
 
 /**
  * Send a UDP datagram

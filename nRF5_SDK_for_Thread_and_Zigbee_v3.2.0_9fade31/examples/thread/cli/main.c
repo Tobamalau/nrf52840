@@ -62,7 +62,10 @@
 
 #define THREAD_CONFIG 1
 
+char message[20];
 
+void handleUdpReceive(void *aContext, otMessage *aMessage, 
+                      const otMessageInfo *aMessageInfo);
 /***************************************************************************************************
  * @section Callbacks
  **************************************************************************************************/
@@ -98,6 +101,20 @@ static void bsp_event_handler(bsp_event_t event)
           default:
             break;
     }
+}
+
+void handleUdpReceive(void *aContext, otMessage *aMessage,
+                      const otMessageInfo *aMessageInfo)
+{
+    OT_UNUSED_VARIABLE(aContext);
+    OT_UNUSED_VARIABLE(aMessage);
+    OT_UNUSED_VARIABLE(aMessageInfo);
+    NRF_LOG_INFO("otMessageGetLength:%d", otMessageGetLength(aMessage));
+    otMessageRead(aMessage, otMessageGetOffset(aMessage), message, otMessageGetLength(aMessage));
+    otIp6Address test = aMessageInfo->mPeerAddr;
+    NRF_LOG_INFO("UDP Message recived:%d", 33);
+    bsp_board_led_invert(1);
+    
 }
 
 /***************************************************************************************************
@@ -201,6 +218,7 @@ int main(int argc, char *argv[])
     {
 #if THREAD_CONFIG
     thread_init_Tobi(thread_state_changed_callback);
+    initUdp(thread_ot_instance_get(), handleUdpReceive);
 #else
     thread_instance_init();
     initUdp(thread_ot_instance_get());
