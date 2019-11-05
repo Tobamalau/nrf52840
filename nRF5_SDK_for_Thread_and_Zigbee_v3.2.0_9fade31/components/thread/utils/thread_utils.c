@@ -332,7 +332,10 @@ void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t paylo
     otMessage *   message;
     otMessageInfo messageInfo;
     otIp6Address  destinationAddr;
-
+    if(otLinkIsInTransmitState(aInstance))
+    {
+        NRF_LOG_INFO("otLinkIsInTransmitState");
+    }
     memset(&messageInfo, 0, sizeof(messageInfo));
 
     otIp6AddressFromString(UDP_DEST_ADDR, &destinationAddr);
@@ -346,8 +349,8 @@ void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t paylo
     error = otMessageAppend(message, payload, payloadLength);
     otEXPECT(error == OT_ERROR_NONE);
 
-    //error = otUdpSend(&sUdpSocket, message, &messageInfo);
-    error = otUdpSendDatagram(aInstance, message, &messageInfo);
+    error = otUdpSend(&sUdpSocket, message, &messageInfo);
+    //error = otUdpSendDatagram(aInstance, message, &messageInfo);
 
  exit:
     if (error != OT_ERROR_NONE && message != NULL)
