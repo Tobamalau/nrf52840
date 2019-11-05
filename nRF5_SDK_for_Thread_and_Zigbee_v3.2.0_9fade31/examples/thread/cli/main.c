@@ -54,6 +54,7 @@
 #include "nrf_log_default_backends.h"
 
 #include "thread_utils.h"
+#include "youtube48_8_vbr.c"
 
 #include <openthread/thread.h>
 
@@ -61,8 +62,8 @@
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
 
 #define THREAD_CONFIG 1
+static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 
-char message[20];
 
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
                       const otMessageInfo *aMessageInfo);
@@ -83,19 +84,32 @@ static void bsp_event_handler(bsp_event_t event)
     {
         case BSP_EVENT_KEY_0:
             NRF_LOG_INFO("Button 1 pressed");
-            sendUdp(thread_ot_instance_get());
+            sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));            
             break;
 
         case BSP_EVENT_KEY_1:
             NRF_LOG_INFO("Button 2 pressed");
+            sendUdp(thread_ot_instance_get(), opusData, NBbytes[0]);
             break;
 
         case BSP_EVENT_KEY_2:
             NRF_LOG_INFO("Button 3 pressed");
+            sendUdp(thread_ot_instance_get(), opusData, NBbytes[2]);
             break;
 
         case BSP_EVENT_KEY_3:
             NRF_LOG_INFO("Button 4 pressed");
+            int16_t nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
+            uint32_t nbbytessum = 0;
+            const unsigned char *input = opusData;
+            int i = 0;
+            for(i ; i<nbbytescnt; i++)
+            {
+              sendUdp(thread_ot_instance_get(), input, NBbytes[i]);
+              nbbytessum += NBbytes[0];
+              input = opusData + nbbytessum;
+            }
+            NRF_LOG_INFO("%d mal UDP send", i);
             break;
 
           default:
@@ -106,13 +120,12 @@ static void bsp_event_handler(bsp_event_t event)
 void handleUdpReceive(void *aContext, otMessage *aMessage,
                       const otMessageInfo *aMessageInfo)
 {
+    char messageBuffer[otMessageGetLength(aMessage)];
+
     OT_UNUSED_VARIABLE(aContext);
-    OT_UNUSED_VARIABLE(aMessage);
     OT_UNUSED_VARIABLE(aMessageInfo);
-    NRF_LOG_INFO("otMessageGetLength:%d", otMessageGetLength(aMessage));
-    otMessageRead(aMessage, otMessageGetOffset(aMessage), message, otMessageGetLength(aMessage));
-    otIp6Address test = aMessageInfo->mPeerAddr;
-    NRF_LOG_INFO("UDP Message recived:%d", 33);
+    otMessageRead(aMessage, otMessageGetOffset(aMessage), messageBuffer, otMessageGetLength(aMessage));
+    NRF_LOG_INFO("UDP Message recived:%s", messageBuffer);
     bsp_board_led_invert(1);
     
 }

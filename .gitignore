@@ -58,6 +58,7 @@ nrf51-ble-tutorial-advertising/
 *.emSession
 *.xml
 *.msi
+*SEGGER_RTT_Syscalls_SES.asm
 
 # Prerequisites
 *.d
