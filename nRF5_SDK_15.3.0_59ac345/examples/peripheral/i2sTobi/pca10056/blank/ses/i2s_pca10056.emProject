@@ -75,8 +75,6 @@
       <file file_name="../../../main.c" />
       <file file_name="../config/sdk_config.h" />
       <file file_name="../config/sound.h" />
-      <file file_name="../../../../../../external/opus/lib/libopus.a" />
-      <file file_name="../../../opusTobi.c" />
     </folder>
     <folder Name="nRF_Segger_RTT">
       <file file_name="../../../../../../external/segger_rtt/SEGGER_RTT.c" />
@@ -96,6 +94,10 @@
       c_user_include_directories="$(HomeDir)/src/nrf52840-DK/external/opus/include/opus\;../../../../../../external/opus/include/opus\;."
       link_include_standard_libraries="Yes"
       linker_additional_files="$../../../../../../external/opus/lib\;/opt/gcc-arm-none-eabi-8-2019-q3-update/arm-none-eabi/lib/libc.a\;/opt/gcc-arm-none-eabi-8-2019-q3-update/arm-none-eabi/lib/libstdc++.a" />
+    <folder Name="Opus">
+      <file file_name="../../../../../../../src/opus/lib/libopus.a" />
+      <file file_name="../../../../../../../src/opus/opusTobi.c" />
+    </folder>
   </project>
   <configuration
     Name="Release"

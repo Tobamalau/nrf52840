@@ -35,6 +35,7 @@ nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/modules/*
 nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/*
 !nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/
 nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/*
+!nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/cliOpus
 !nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/cliTobi
 !nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/cli
 !nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/components/thread
@@ -87,9 +88,10 @@ nrf51-ble-tutorial-advertising/
 *.x86_64
 *.hex
 
+# Exclude Folders
 **/pca10040/*
 **/arm4/*
 **/arm5_no_packs/*
 **/iar/*
-
+**/_build/*
 

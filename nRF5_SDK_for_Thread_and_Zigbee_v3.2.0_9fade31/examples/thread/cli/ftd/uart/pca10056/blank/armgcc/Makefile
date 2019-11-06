@@ -2,7 +2,8 @@ PROJECT_NAME     := thread_cli_ftd_uart_pca10056
 TARGETS          := nrf52840_xxaa
 OUTPUT_DIRECTORY := _build
 
-SDK_ROOT := ../../../../../../../..
+TOP_ROOT := $(HOME)/src/nrf52840-DK
+SDK_ROOT := $(TOP_ROOT)/nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31#../../../../../../../..
 PROJ_DIR := ../../..
 
 $(OUTPUT_DIRECTORY)/nrf52840_xxaa.out: \

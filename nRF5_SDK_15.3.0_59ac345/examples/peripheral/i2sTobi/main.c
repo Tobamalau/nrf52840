@@ -49,7 +49,7 @@ void initI2S()
    NRF_I2S->PSEL.SDOUT = (I2S_SDOUT_PIN << I2S_PSEL_SDOUT_PIN_Pos);
 
    NRF_I2S->ENABLE = 1;
-}
+   }
 
 /**@snippet [Handling the data received over UART] */
 void uart_event_handle(app_uart_evt_t * p_event)
@@ -62,25 +62,25 @@ void uart_event_handle(app_uart_evt_t * p_event)
 /**@snippet [UART Initialization] */
 static uint32_t uart_init(void)
 {
-    uint32_t                     err_code;
-    const app_uart_comm_params_t comm_params =
-    {
-        RX_PIN_NUMBER,
-        TX_PIN_NUMBER,
-        RTS_PIN_NUMBER,
-        CTS_PIN_NUMBER,
-        APP_UART_FLOW_CONTROL_DISABLED,
-        false,
-        UART_BAUDRATE_BAUDRATE_Baud115200
-    };
-    APP_UART_FIFO_INIT( &comm_params,
-                       UART_RX_BUF_SIZE,
-                       UART_TX_BUF_SIZE,
-                       uart_event_handle,
-                       APP_IRQ_PRIORITY_MID,
-                       err_code);
-    return err_code;
-    //APP_ERROR_CHECK(err_code);
+   uint32_t                     err_code;
+   const app_uart_comm_params_t comm_params =
+   {
+     RX_PIN_NUMBER,
+     TX_PIN_NUMBER,
+     RTS_PIN_NUMBER,
+     CTS_PIN_NUMBER,
+     APP_UART_FLOW_CONTROL_DISABLED,
+     false,
+     UART_BAUDRATE_BAUDRATE_Baud115200
+   };
+   APP_UART_FIFO_INIT( &comm_params,
+                    UART_RX_BUF_SIZE,
+                    UART_TX_BUF_SIZE,
+                    uart_event_handle,
+                    APP_IRQ_PRIORITY_MID,
+                    err_code);
+   return err_code;
+   //APP_ERROR_CHECK(err_code);
 }
 
 int main(void)
@@ -91,8 +91,8 @@ int main(void)
 
    printf("\n\nUart Init:%ld\n", err_t);
    initI2S();
-
-
+   
+  
    //uint_fast16_t len = 57;
    volatile uint8_t newFrame = 1;
    volatile uint8_t bufferNr = 0;
@@ -105,11 +105,11 @@ int main(void)
    getPcm(&FrameInstanz, bufferNr);
    //int test =  sizeof(sine_table) / sizeof(uint32_t);
 
-  NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
-  //NRF_I2S->RXTXD.MAXCNT = 960;//NBbytes[FrameInstanz.loopcnt-1];
-  NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
-  NRF_I2S->TASKS_START = 1;
-  bufferNr ^= (1 << 0);
+   NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
+   //NRF_I2S->RXTXD.MAXCNT = 960;//NBbytes[FrameInstanz.loopcnt-1];
+   NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+   NRF_I2S->TASKS_START = 1;
+   bufferNr ^= (1 << 0);
    /*
      NRF_I2S->TXD.PTR = (uint32_t)&sine_table[0];
   NRF_I2S->RXTXD.MAXCNT = sizeof(sine_table) / sizeof(uint32_t);

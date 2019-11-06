@@ -82,9 +82,6 @@ void handleUdpReceive(void *aContext, otMessage *aMessage,
  */
 static void bsp_event_handler(bsp_event_t event)
 {
-    uint32_t err;
-    uint32_t cpu_util;
-
     switch (event)
     {
         case BSP_EVENT_KEY_0:
@@ -107,8 +104,8 @@ static void bsp_event_handler(bsp_event_t event)
             int16_t nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
             uint32_t nbbytessum = 0;
             const unsigned char *input = opusData;
-            int i = 0;
-            for(i ; i<nbbytescnt; i++)
+            
+            for(int i = 0; i<nbbytescnt; i++)
             {
               sendUdp(thread_ot_instance_get(), input, NBbytes[i]);
               /*while(!otLinkIsInTransmitState(thread_ot_instance_get())){
@@ -118,7 +115,7 @@ static void bsp_event_handler(bsp_event_t event)
               nbbytessum += NBbytes[i];
               input = opusData + nbbytessum;
             }
-            NRF_LOG_INFO("%d mal UDP send", i);
+            //NRF_LOG_INFO("%d mal UDP send", i);
             break;
 
           default:
@@ -193,7 +190,7 @@ static void log_init(void)
 
 
 /**@brief Function for initializing the Thread Stack.
- */
+ 
 static void thread_instance_init(void)
 {
     thread_configuration_t thread_configuration =
@@ -210,7 +207,7 @@ static void thread_instance_init(void)
     uint32_t err_code = bsp_thread_init(thread_ot_instance_get()); //otSetStateChangedCallback(), otIcmp6RegisterHandler()
     APP_ERROR_CHECK(err_code);
 }
-
+*/
 
 /**@brief Function for deinitializing the Thread Stack.
  *

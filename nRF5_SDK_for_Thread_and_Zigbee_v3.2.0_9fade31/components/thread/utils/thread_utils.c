@@ -82,7 +82,7 @@ static otUdpSocket sUdpSocket;
 void thread_init_Tobi(otStateChangedCallback handler)
 {
     otError error;
-    otSysInit(NULL, NULL);
+    otSysInit(0, NULL);
 
     mp_ot_instance = otInstanceInitSingle();
     ASSERT(mp_ot_instance != NULL);
