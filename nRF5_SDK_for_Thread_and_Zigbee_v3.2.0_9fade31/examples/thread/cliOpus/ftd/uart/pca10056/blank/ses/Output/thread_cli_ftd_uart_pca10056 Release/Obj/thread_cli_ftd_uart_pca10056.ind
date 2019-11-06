@@ -48,6 +48,8 @@
 "../../../../../../../../external/openthread/lib/nrf52840/gcc/libopenthread-nrf52840-sdk.a"
 "../../../../../../../../external/openthread/lib/nrf52840/gcc/libnordicsemi-nrf52840-radio-driver.a"
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/thread_utils.o"
+"Output/thread_cli_ftd_uart_pca10056 Release/Obj/opusTobi.o"
+"../../../../../../../../../src/opus/lib/libopus.a"
 "/usr/share/segger_embedded_studio_for_arm_4.22/lib/libdebugio_mempoll_v7em_fpv4_sp_d16_hard_t_le_eabi.a"
 "/usr/share/segger_embedded_studio_for_arm_4.22/lib/libm_v7em_fpv4_sp_d16_hard_t_le_eabi.a"
 "/usr/share/segger_embedded_studio_for_arm_4.22/lib/libc_v7em_fpv4_sp_d16_hard_t_le_eabi.a"

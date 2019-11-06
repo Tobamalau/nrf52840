@@ -54,6 +54,9 @@
 #include "nrf_log_default_backends.h"
 
 #include "thread_utils.h"
+
+#include "opus.h"
+#include "opusTobi.h"
 #include "youtube48_8_vbr.c"
 
 #include <openthread/thread.h>
@@ -65,10 +68,15 @@
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 static const unsigned char UDP_REQUEST[]   = "r";
 
+int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -23170, -23170, -32768, -32768, -23170, -23170};
+
 int16_t Nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
 int16_t sendLoopCnt = 0;
 uint32_t Nbbytessum = 0;
-
+uint8_t FrameRequest = 0;
+uint8_t newFrame = 0;
+uint8_t bufferNr = 0;
+struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
 
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
                       const otMessageInfo *aMessageInfo);
@@ -123,18 +131,25 @@ static void bsp_event_handler(bsp_event_t event)
     }
 }
 
-void handleUdpReceive(void *aContext, otMessage *aMessage,
-                      const otMessageInfo *aMessageInfo)
+void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
-    char messageBuffer[otMessageGetLength(aMessage)];
+   unsigned char messageBuffer[otMessageGetLength(aMessage)];
 
-    OT_UNUSED_VARIABLE(aContext);
-    OT_UNUSED_VARIABLE(aMessageInfo);
-    otMessageRead(aMessage, otMessageGetOffset(aMessage), messageBuffer, otMessageGetLength(aMessage));
-    NRF_LOG_INFO("UDP Message recived:%s", messageBuffer);
-    bsp_board_led_invert(1);
-    if(messageBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)
-    {
+   OT_UNUSED_VARIABLE(aContext);
+   OT_UNUSED_VARIABLE(aMessageInfo);
+   otMessageRead(aMessage, otMessageGetOffset(aMessage), messageBuffer, otMessageGetLength(aMessage));
+   NRF_LOG_INFO("UDP Message recived:%s", messageBuffer);
+   bsp_board_led_invert(1);
+   if(FrameRequest)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
+   {
+      OpusInstanz.input = messageBuffer;
+      OpusInstanz.nbBytes = 513;
+      decodeOpusFrame(&OpusInstanz, bufferNr);
+      NRF_I2S->TASKS_START = 1;
+      newFrame = 0;
+   }
+   else if(messageBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)      //Problem das alle Teinehmer zurücksenden würden!!
+   {
       const unsigned char *input;
       if(sendLoopCnt>=Nbbytescnt)
         sendLoopCnt = 0;
@@ -143,12 +158,8 @@ void handleUdpReceive(void *aContext, otMessage *aMessage,
       sendUdp(thread_ot_instance_get(), input, NBbytes[sendLoopCnt]);
       Nbbytessum += NBbytes[sendLoopCnt];
       sendLoopCnt++;     
-    }   
+   }   
 }
-
-/***************************************************************************************************
- * @section State
- **************************************************************************************************/
 
 static void thread_state_changed_callback(uint32_t flags, void * p_context)
 {
@@ -159,6 +170,35 @@ static void thread_state_changed_callback(uint32_t flags, void * p_context)
 /***************************************************************************************************
  * @section Initialization
  **************************************************************************************************/
+/**@brief Function for initializing I2S Module.
+ */
+void initI2S()
+{
+   // Enable transmission
+   NRF_I2S->CONFIG.TXEN = (I2S_CONFIG_TXEN_TXEN_ENABLE << I2S_CONFIG_TXEN_TXEN_Pos);
+   // Enable MCK generator
+   NRF_I2S->CONFIG.MCKEN = (I2S_CONFIG_MCKEN_MCKEN_ENABLE << I2S_CONFIG_MCKEN_MCKEN_Pos);
+   // MCKFREQ
+   NRF_I2S->CONFIG.MCKFREQ = I2S_CONFIG_MCKFREQ_MCKFREQ_32MDIV21  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
+   // Ratio = 96
+   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_32X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
+   // Master mode, 16Bit, left aligned
+   NRF_I2S->CONFIG.MODE = I2S_CONFIG_MODE_MODE_MASTER << I2S_CONFIG_MODE_MODE_Pos;
+   NRF_I2S->CONFIG.SWIDTH = I2S_CONFIG_SWIDTH_SWIDTH_16BIT << I2S_CONFIG_SWIDTH_SWIDTH_Pos;
+   NRF_I2S->CONFIG.ALIGN = I2S_CONFIG_ALIGN_ALIGN_LEFT << I2S_CONFIG_ALIGN_ALIGN_Pos;
+   // Format = I2S
+   NRF_I2S->CONFIG.FORMAT = I2S_CONFIG_FORMAT_FORMAT_I2S << I2S_CONFIG_FORMAT_FORMAT_Pos;
+   // Use stereo
+   //NRF_I2S->CONFIG.CHANNELS = I2S_CONFIG_CHANNELS_CHANNELS_STEREO << I2S_CONFIG_CHANNELS_CHANNELS_Pos;
+   NRF_I2S->CONFIG.CHANNELS = I2S_CONFIG_CHANNELS_CHANNELS_Left << I2S_CONFIG_CHANNELS_CHANNELS_Pos;
+   // Configure pins
+   NRF_I2S->PSEL.MCK = (I2S_CONFIG_MCK_PIN << I2S_PSEL_MCK_PIN_Pos);
+   NRF_I2S->PSEL.SCK = (I2S_CONFIG_SCK_PIN << I2S_PSEL_SCK_PIN_Pos);
+   NRF_I2S->PSEL.LRCK = (I2S_CONFIG_LRCK_PIN << I2S_PSEL_LRCK_PIN_Pos);
+   NRF_I2S->PSEL.SDOUT = (I2S_CONFIG_SDOUT_PIN << I2S_PSEL_SDOUT_PIN_Pos);
+
+   NRF_I2S->ENABLE = 1;
+   }
 
 /**@brief Function for initializing the Application Timer Module.
  */
@@ -188,27 +228,6 @@ static void log_init(void)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
-
-/**@brief Function for initializing the Thread Stack.
- 
-static void thread_instance_init(void)
-{
-    thread_configuration_t thread_configuration =
-    {
-        .radio_mode        = THREAD_RADIO_MODE_RX_ON_WHEN_IDLE,
-        .autocommissioning = true,
-        .autostart_disable = false,
-    };
-
-    thread_init(&thread_configuration);
-    thread_cli_init();                //wie im openthread Beispiel ruft dann otCliUartInit(instance) auf
-    thread_state_changed_callback_set(thread_state_changed_callback); //wie im openthread Beispiel
-    //hier im openthread kommt noch setNetworkConfiguration() wo PanID und Masterkey definbiert wurde
-    uint32_t err_code = bsp_thread_init(thread_ot_instance_get()); //otSetStateChangedCallback(), otIcmp6RegisterHandler()
-    APP_ERROR_CHECK(err_code);
-}
-*/
-
 /**@brief Function for deinitializing the Thread Stack.
  *
  */
@@ -232,43 +251,66 @@ static void scheduler_init(void)
 
 int main(int argc, char *argv[])
 {
-#if 1
-    log_init();
-    scheduler_init();
-    timer_init();
-    leds_init();
+   int err;
+   
 
-    uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
-    APP_ERROR_CHECK(err_code);
 
-#endif    
+   log_init();
+   scheduler_init();    //Scheduler speichert die Events?
+   timer_init();
+   leds_init();
 
-    while (true)
-    {
-#if THREAD_CONFIG
-    thread_init_Tobi(thread_state_changed_callback);
-    initUdp(thread_ot_instance_get(), handleUdpReceive);
-#else
-    thread_instance_init();
-    initUdp(thread_ot_instance_get());
-#endif
+   uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
+   APP_ERROR_CHECK(err_code);
 
-        
-        
+   /*Init I2S/Opus decoder*/
+   initI2S();
+   NRF_I2S->TXD.PTR = (uint32_t)&sine_table[0];
+   NRF_I2S->RXTXD.MAXCNT = sizeof(sine_table) / sizeof(sine_table);
+   
+   err = initOpus(&OpusInstanz);
+   if(!err)
+      NRF_LOG_INFO("initOpus error");
 
-        while (!thread_soft_reset_was_requested())
-        {
-#if 1
-            thread_process();
-#endif
-            app_sched_execute();
+   /*while loop*/
+   while (true)
+   {
+   thread_init_Tobi(thread_state_changed_callback);
+   initUdp(thread_ot_instance_get(), handleUdpReceive);
 
-            if (NRF_LOG_PROCESS() == false)
-            {
-                thread_sleep();
-            }
-        }
 
-        thread_instance_finalize();
-    }
+   while (!thread_soft_reset_was_requested())
+   {
+
+      thread_process();
+      app_sched_execute();
+
+      if (NRF_LOG_PROCESS() == false)
+      {
+         thread_sleep();
+      }
+
+      if(newFrame)
+      {
+         if(!FrameRequest)
+            sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
+         FrameRequest = 1;
+      }
+      /* New I2S buffer*/
+      if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
+      {
+         if(FrameRequest)
+         {
+            NRF_LOG_INFO("I2S Buffer empty");
+            continue;
+         }
+         NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
+         NRF_I2S->EVENTS_TXPTRUPD = 0;
+         newFrame = 1;
+         bufferNr ^= (1 << 0);
+      }
+   }
+
+   thread_instance_finalize();
+   }
 }

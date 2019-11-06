@@ -1,7 +1,7 @@
 /*lib for Opos functions created by Tobias*/
 
 #include "opusTobi.h"
-#include "youtube48_8_vbr.c"
+//#include "youtube48_8_vbr.c"
 //#include "opusFile.c"
 #include <stdio.h>
 #include <string.h>
@@ -69,14 +69,14 @@ int initOpusFrame(struct frame *frame_t)
       printf("failed to create decoder: %s\n", opus_strerror(err));
       return 0;
    }
-   frame_t->nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
+   //frame_t->nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
    return 1;
 }
 
 void getPcm(struct frame *frame_t, uint8_t bufferNr)
 {
-   frame_t->opus_t->input = opusData + frame_t->nbbytessum;
-   frame_t->opus_t->nbBytes = NBbytes[frame_t->loopcnt];
+   //frame_t->opus_t->input = opusData + frame_t->nbbytessum;
+   //frame_t->opus_t->nbBytes = NBbytes[frame_t->loopcnt];
    decodeOpusFrame(frame_t->opus_t, bufferNr);
    frame_t->nbbytessum += frame_t->opus_t->nbBytes;
    frame_t->loopcnt++;

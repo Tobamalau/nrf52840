@@ -51,6 +51,7 @@ SRC_FILES += \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT_printf.c \
   $(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
   $(SDK_ROOT)/components/thread/utils/thread_utils.c \
+  $(TOP_ROOT)/src/opus/opusTobi.c \
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -90,6 +91,7 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/libraries/pwr_mgmt \
   $(SDK_ROOT)/external/nrf_cc310/include \
   $(SDK_ROOT)/components/libraries/timer \
+  $(TOP_ROOT)/src/opus/include/opus \
 
 # Libraries common to all targets
 LIB_FILES += \
@@ -152,6 +154,7 @@ LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 LDFLAGS += -Wl,--gc-sections
 # use newlib in nano version
 LDFLAGS += --specs=nano.specs
+LDFLAGS += -L$(TOP_ROOT)/src/opus/lib
 
 nrf52840_xxaa: CFLAGS += -D__HEAP_SIZE=0
 nrf52840_xxaa: CFLAGS += -D__STACK_SIZE=8192
@@ -160,7 +163,7 @@ nrf52840_xxaa: ASMFLAGS += -D__STACK_SIZE=8192
 
 # Add standard libraries at the very end of the linker input, after all objects
 # that may need symbols provided by these libraries.
-LIB_FILES += -lc -lnosys -lm -lstdc++
+LIB_FILES += -lopus -lc -lnosys -lm -lstdc++
 
 
 .PHONY: default help
