@@ -15,6 +15,8 @@
 #include "nrf_log_default_backends.h"
 #include "youtube48_8_vbr.c"
 
+#include "nrf_drv_timer.h" //Timer
+
 /*Anfang Uart Init*/
 #include "boards.h"
 #include "app_uart.h"
@@ -22,6 +24,8 @@
 #define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
 /*Ende Uart Init*/
 
+const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
+volatile uint16_t timerCnt = 0;
 //int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -23170, -23170, -32768, -32768, -23170, -23170};
 
 void initI2S()
@@ -51,7 +55,27 @@ void initI2S()
 
    NRF_I2S->ENABLE = 1;
    }
+/**
+ * @brief Handler for timer events.
+ */
+void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
+{
+    switch (event_type)
+    {
+        case NRF_TIMER_EVENT_COMPARE0:
+            timerCnt++;
+            if(timerCnt == 1000)
+            {
+               timerCnt = 0;
+               //printf("\r1 Sekunde");
+            }
+            break;
 
+        default:
+            //Do nothing.
+            break;
+    }
+}
 /**@snippet [Handling the data received over UART] */
 void uart_event_handle(app_uart_evt_t * p_event)
 {
@@ -86,13 +110,27 @@ static uint32_t uart_init(void)
 
 int main(void)
 {
+   //volatile uint16_t curTime;
    uint32_t err_t;
    err_t = uart_init();
-   
-
    printf("\n\nUart Init:%ld\n", err_t);
    initI2S();
-   
+   /*Timer Init*/
+   uint32_t time_ms = 1; //Time(in miliseconds) between consecutive compare events.
+   uint32_t time_ticks;
+
+   //Configure TIMER for generating 1ms takt
+   nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
+   err_t = nrf_drv_timer_init(&TIMER, &timer_cfg, timer_event_handler);
+   APP_ERROR_CHECK(err_t);
+
+   time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER, time_ms);
+
+   nrf_drv_timer_extended_compare(
+      &TIMER, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
+
+   nrf_drv_timer_enable(&TIMER);
+         
   
    //uint_fast16_t len = 57;
    volatile uint8_t newFrame = 1;
@@ -138,8 +176,9 @@ int main(void)
        if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
        {
            //printf("\nEVENT bufferNr:%d\n", bufferNr);
+           printf("\r%d ms", timerCnt);
            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
-           NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+           timerCnt = 0;
            NRF_I2S->EVENTS_TXPTRUPD = 0;
            newFrame = 1;
            bufferNr ^= (1 << 0);
