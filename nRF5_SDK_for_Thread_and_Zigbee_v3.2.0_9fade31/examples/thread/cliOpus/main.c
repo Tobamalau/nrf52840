@@ -133,22 +133,24 @@ static void bsp_event_handler(bsp_event_t event)
 
 void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
-   unsigned char messageBuffer[otMessageGetLength(aMessage)];
+   uint16_t msgLength = otMessageGetLength(aMessage);
+   uint16_t msgOffset = otMessageGetOffset(aMessage);
+   unsigned char msgBuffer[msgLength];
 
    OT_UNUSED_VARIABLE(aContext);
    OT_UNUSED_VARIABLE(aMessageInfo);
-   otMessageRead(aMessage, otMessageGetOffset(aMessage), messageBuffer, otMessageGetLength(aMessage));
-   NRF_LOG_INFO("UDP Message recived:%s", messageBuffer);
+   otMessageRead(aMessage, msgOffset, msgBuffer, msgLength);
+   NRF_LOG_INFO("UDP Message recived Offset:%d Length:%d\n%s", msgOffset, msgLength, msgBuffer);
    bsp_board_led_invert(1);
    if(FrameRequest)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
    {
-      OpusInstanz.input = messageBuffer;
-      OpusInstanz.nbBytes = 513;
+      OpusInstanz.input = msgBuffer;
+      OpusInstanz.nbBytes = msgLength;
       decodeOpusFrame(&OpusInstanz, bufferNr);
       NRF_I2S->TASKS_START = 1;
       newFrame = 0;
    }
-   else if(messageBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)      //Problem das alle Teinehmer zurücksenden würden!!
+   else if(msgBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)      //Problem das alle Teinehmer zurücksenden würden!!
    {
       const unsigned char *input;
       if(sendLoopCnt>=Nbbytescnt)
