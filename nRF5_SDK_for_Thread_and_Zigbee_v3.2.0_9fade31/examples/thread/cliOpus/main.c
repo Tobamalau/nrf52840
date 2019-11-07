@@ -63,7 +63,7 @@
 
 #define SCHED_QUEUE_SIZE      32                              /**< Maximum number of events in the scheduler queue. */
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
-
+#define SENDTRIAL 10                                          /* Maximale Sendeversuche */
 #define THREAD_CONFIG 1
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 static const unsigned char UDP_REQUEST[]   = "r";
@@ -77,7 +77,9 @@ uint8_t FrameRequest = 0;
 uint8_t newFrame = 0;
 uint8_t bufferNr = 0;
 struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
+const unsigned char *input;
 
+void setI2SBuffer();
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
                       const otMessageInfo *aMessageInfo);
 /***************************************************************************************************
@@ -93,8 +95,11 @@ static void bsp_event_handler(bsp_event_t event)
     switch (event)
     {
         case BSP_EVENT_KEY_0:
-            NRF_LOG_INFO("Button 1 pressed");
-            sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));            
+            NRF_LOG_INFO("Stop Streaming");
+            sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
+            FrameRequest = 0;
+            newFrame = 0;
+            NRF_I2S->TASKS_START = 0;
             break;
 
         case BSP_EVENT_KEY_1:
@@ -103,8 +108,8 @@ static void bsp_event_handler(bsp_event_t event)
             break;
 
         case BSP_EVENT_KEY_2:
-            NRF_LOG_INFO("Button 3 (UDP_REQUEST) pressed");
-            sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
+            NRF_LOG_INFO("Start Streaming");
+            newFrame = 1;        
             break;
 
         case BSP_EVENT_KEY_3:
@@ -133,6 +138,8 @@ static void bsp_event_handler(bsp_event_t event)
 
 void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
+   int err;
+   uint8_t errorloop = 0;
    uint16_t msgLength = otMessageGetLength(aMessage);
    uint16_t msgOffset = otMessageGetOffset(aMessage);
    unsigned char msgBuffer[msgLength];
@@ -142,22 +149,40 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
    otMessageRead(aMessage, msgOffset, msgBuffer, msgLength);
    NRF_LOG_INFO("UDP Message recived Offset:%d Length:%d\n%s", msgOffset, msgLength, msgBuffer);
    bsp_board_led_invert(1);
+   /*nur im ersten Durchlauf*/
    if(FrameRequest)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
    {
       OpusInstanz.input = msgBuffer;
       OpusInstanz.nbBytes = msgLength;
       decodeOpusFrame(&OpusInstanz, bufferNr);
-      NRF_I2S->TASKS_START = 1;
+      FrameRequest = 0;
+      if(!NRF_I2S->TASKS_START)
+      {
+         setI2SBuffer();
+         NRF_I2S->TASKS_START = 1;
+      }
       newFrame = 0;
    }
+   /*Stream Request empfangen sende n-te Daten*/
    else if(msgBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)      //Problem das alle Teinehmer zurücksenden würden!!
    {
-      const unsigned char *input;
       if(sendLoopCnt>=Nbbytescnt)
-        sendLoopCnt = 0;
+      {
+         sendLoopCnt = 0;
+         Nbbytessum = 0;
+      }
 
       input = opusData + Nbbytessum;
-      sendUdp(thread_ot_instance_get(), input, NBbytes[sendLoopCnt]);
+      NRF_LOG_INFO("input:%x,%x", *input, input);
+      do{
+         err = sendUdp(thread_ot_instance_get(), input, NBbytes[sendLoopCnt]);
+         if(errorloop == SENDTRIAL)
+         {
+            NRF_LOG_INFO("send failed after %d trial", SENDTRIAL);
+            break;
+         }
+         errorloop++;
+      }while(err != OT_ERROR_NONE);
       Nbbytessum += NBbytes[sendLoopCnt];
       sendLoopCnt++;     
    }   
@@ -246,6 +271,17 @@ static void scheduler_init(void)
 {
     APP_SCHED_INIT(SCHED_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
 }
+/***************************************************************************************************
+ * @section Functions
+ **************************************************************************************************/
+void setI2SBuffer()
+{
+   NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
+   NRF_I2S->EVENTS_TXPTRUPD = 0;
+   NRF_I2S->TASKS_START = 1;
+   newFrame = 1;
+   bufferNr ^= (1 << 0);
+}
 
 /***************************************************************************************************
  * @section Main
@@ -254,9 +290,7 @@ static void scheduler_init(void)
 int main(int argc, char *argv[])
 {
    int err;
-   
-
-
+  
    log_init();
    scheduler_init();    //Scheduler speichert die Events?
    timer_init();
@@ -267,8 +301,8 @@ int main(int argc, char *argv[])
 
    /*Init I2S/Opus decoder*/
    initI2S();
-   NRF_I2S->TXD.PTR = (uint32_t)&sine_table[0];
-   NRF_I2S->RXTXD.MAXCNT = sizeof(sine_table) / sizeof(sine_table);
+   //NRF_I2S->TXD.PTR = (uint32_t)&sine_table[0];
+   //NRF_I2S->RXTXD.MAXCNT = sizeof(sine_table) / sizeof(sine_table);
    
    err = initOpus(&OpusInstanz);
    if(!err)
@@ -277,42 +311,47 @@ int main(int argc, char *argv[])
    /*while loop*/
    while (true)
    {
-   thread_init_Tobi(thread_state_changed_callback);
-   initUdp(thread_ot_instance_get(), handleUdpReceive);
+      thread_init_Tobi(thread_state_changed_callback);
+      initUdp(thread_ot_instance_get(), handleUdpReceive);
 
 
-   while (!thread_soft_reset_was_requested())
-   {
-
-      thread_process();
-      app_sched_execute();
-
-      if (NRF_LOG_PROCESS() == false)
+      while (!thread_soft_reset_was_requested())
       {
-         thread_sleep();
-      }
 
-      if(newFrame)
-      {
-         if(!FrameRequest)
-            sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
-         FrameRequest = 1;
-      }
-      /* New I2S buffer*/
-      if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
-      {
-         if(FrameRequest)
+         thread_process();
+         app_sched_execute();
+
+         if (NRF_LOG_PROCESS() == false)
          {
-            NRF_LOG_INFO("I2S Buffer empty");
-            continue;
+            thread_sleep();
          }
-         NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
-         NRF_I2S->EVENTS_TXPTRUPD = 0;
-         newFrame = 1;
-         bufferNr ^= (1 << 0);
-      }
-   }
+         /*Frame Request*/  
+         if(newFrame)
+         {
+            if(!FrameRequest) //Request sent
+            {
+               err = sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
+               if(err == OT_ERROR_NONE)
+               {
+                  FrameRequest = 1;
+               }
+            }
+         }        
+         /* New I2S buffer*/
+         if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
+         {
+            if(FrameRequest)  //Request were not served
+            {
+               NRF_LOG_INFO("I2S Buffer empty");
+            }
+            else
+            {
+               setI2SBuffer();
+            }
+         }
 
-   thread_instance_finalize();
+      }
+
+      thread_instance_finalize();
    }
 }

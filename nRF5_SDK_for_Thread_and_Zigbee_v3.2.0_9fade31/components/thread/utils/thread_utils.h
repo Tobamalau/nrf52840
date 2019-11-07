@@ -141,7 +141,7 @@ void initUdp(otInstance *aInstance, otUdpReceive reciveHandler);
  * Send a UDP datagram
  */
 //void sendUdp(otInstance *aInstance);
-void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloadLength);
+int sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloadLength);
 /**
  * Function to handle UDP datagrams received on the listening socket
  */

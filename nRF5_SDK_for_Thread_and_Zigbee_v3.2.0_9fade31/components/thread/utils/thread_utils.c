@@ -326,7 +326,7 @@ void initUdp(otInstance *aInstance, otUdpReceive reciveHandler)
 /**
  * Send a UDP datagram
  */
-void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloadLength)
+int sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloadLength)
 {
     otError       error = OT_ERROR_NONE;
     otMessage *   message;
@@ -335,6 +335,7 @@ void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t paylo
     if(otLinkIsInTransmitState(aInstance))
     {
         NRF_LOG_INFO("otLinkIsInTransmitState");
+        return -1;
     }
     memset(&messageInfo, 0, sizeof(messageInfo));
 
@@ -355,9 +356,10 @@ void sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t paylo
  exit:
     if (error != OT_ERROR_NONE && message != NULL)
     {
-        NRF_LOG_INFO("Error: otUdpSendDatagram");
+        NRF_LOG_INFO("Error: otUdpSend %d", error);
         otMessageFree(message);
     }
+    return OT_ERROR_NONE;
 }
 
 /**
