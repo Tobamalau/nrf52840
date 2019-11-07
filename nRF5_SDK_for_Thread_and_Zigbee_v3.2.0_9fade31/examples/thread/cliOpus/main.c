@@ -73,7 +73,7 @@ int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -
 int16_t Nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
 int16_t sendLoopCnt = 0;
 uint32_t Nbbytessum = 0;
-uint8_t FrameRequest = 0;
+volatile uint8_t FrameRequest = 0;
 uint8_t newFrame = 0;
 uint8_t bufferNr = 0;
 struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
@@ -95,11 +95,12 @@ static void bsp_event_handler(bsp_event_t event)
     switch (event)
     {
         case BSP_EVENT_KEY_0:
-            NRF_LOG_INFO("Stop Streaming");
-            sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
+            NRF_LOG_INFO("Stop Streaming");          
             FrameRequest = 0;
             newFrame = 0;
             NRF_I2S->TASKS_START = 0;
+            NRF_I2S->TASKS_STOP = 1;
+            sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
             break;
 
         case BSP_EVENT_KEY_1:
@@ -277,6 +278,7 @@ static void scheduler_init(void)
 void setI2SBuffer()
 {
    NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
+   NRF_I2S->RXTXD.MAXCNT = 960/2;
    NRF_I2S->EVENTS_TXPTRUPD = 0;
    NRF_I2S->TASKS_START = 1;
    newFrame = 1;
@@ -343,6 +345,8 @@ int main(int argc, char *argv[])
             if(FrameRequest)  //Request were not served
             {
                NRF_LOG_INFO("I2S Buffer empty");
+               NRF_I2S->EVENTS_TXPTRUPD = 0;
+               NRF_I2S->TASKS_STOP = 1;
             }
             else
             {
