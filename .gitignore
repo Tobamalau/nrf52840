@@ -94,4 +94,4 @@ nrf51-ble-tutorial-advertising/
 **/arm5_no_packs/*
 **/iar/*
 **/_build/*
-
+**/Output/*
