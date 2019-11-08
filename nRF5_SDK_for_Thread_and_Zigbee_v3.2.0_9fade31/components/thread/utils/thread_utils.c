@@ -363,19 +363,46 @@ int sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloa
 }
 
 /**
- * Function to handle UDP datagrams received on the listening socket
+ * Send a UDP datagram Opus Packet
  */
-/*
-void handleUdpReceive(void *aContext, otMessage *aMessage,
-                      const otMessageInfo *aMessageInfo)
+int sendUdpOpusPacket(otInstance *aInstance, const unsigned char *payload, uint16_t payloadLength, const unsigned char *header, uint16_t headerLength)
 {
-    OT_UNUSED_VARIABLE(aContext);
-    OT_UNUSED_VARIABLE(aMessage);
-    OT_UNUSED_VARIABLE(aMessageInfo);
-    NRF_LOG_INFO("UDP Message recived");
-    
+    otError       error = OT_ERROR_NONE;
+    otMessage *   message;
+    otMessageInfo messageInfo;
+    otIp6Address  destinationAddr;
+    if(otLinkIsInTransmitState(aInstance))
+    {
+        NRF_LOG_INFO("otLinkIsInTransmitState");
+        return -1;
+    }
+    memset(&messageInfo, 0, sizeof(messageInfo));
+
+    otIp6AddressFromString(UDP_DEST_ADDR, &destinationAddr);
+    messageInfo.mPeerAddr    = destinationAddr;
+    messageInfo.mPeerPort    = UDP_PORT;
+    messageInfo.mInterfaceId = OT_NETIF_INTERFACE_ID_THREAD;  //Neccesary for this version of thread in newer version it's not needed
+
+    message = otUdpNewMessage(aInstance, NULL);
+    otEXPECT_ACTION(message != NULL, error = OT_ERROR_NO_BUFS);
+
+    error = otMessageAppend(message, header, headerLength);
+    otEXPECT(error == OT_ERROR_NONE);
+
+    error = otMessageAppend(message, payload, payloadLength);
+    otEXPECT(error == OT_ERROR_NONE);
+
+    error = otUdpSend(&sUdpSocket, message, &messageInfo);
+    //error = otUdpSendDatagram(aInstance, message, &messageInfo);
+
+ exit:
+    if (error != OT_ERROR_NONE && message != NULL)
+    {
+        NRF_LOG_INFO("Error: otUdpSend %d", error);
+        otMessageFree(message);
+    }
+    return OT_ERROR_NONE;
 }
-*/
 
 /**
  * Override default network settings, such as panid, so the devices can join a network
@@ -396,7 +423,7 @@ void setNetworkConfiguration(otInstance *aInstance)
     aDataset.mComponents.mIsActiveTimestampPresent = true;
     //aDataset.mSecurityPolicy 
     /* Set Channel to 15 */
-    aDataset.mChannel                      = 15;
+    aDataset.mChannel                      = 11;
     aDataset.mComponents.mIsChannelPresent = true;
     
     /* Set Pan ID to 2222 */

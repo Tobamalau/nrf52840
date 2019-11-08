@@ -64,7 +64,8 @@
 #define SCHED_QUEUE_SIZE      32                              /**< Maximum number of events in the scheduler queue. */
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
 #define SENDTRIAL 10                                          /* Maximale Sendeversuche */
-#define THREAD_CONFIG 1
+#define OPUSPACKETPERREQUEST 5
+
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 static const unsigned char UDP_REQUEST[]   = "r";
 
@@ -100,6 +101,8 @@ static void bsp_event_handler(bsp_event_t event)
             newFrame = 0;
             NRF_I2S->TASKS_START = 0;
             NRF_I2S->TASKS_STOP = 1;
+            *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
+            *((volatile uint32_t *)0x4002503C) = 1;
             sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));
             break;
 
@@ -157,12 +160,13 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
       OpusInstanz.nbBytes = msgLength;
       decodeOpusFrame(&OpusInstanz, bufferNr);
       FrameRequest = 0;
+      newFrame = 0;
       if(!NRF_I2S->TASKS_START)
       {
          setI2SBuffer();
          NRF_I2S->TASKS_START = 1;
       }
-      newFrame = 0;
+      
    }
    /*Stream Request empfangen sende n-te Daten*/
    else if(msgBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)      //Problem das alle Teinehmer zurücksenden würden!!
@@ -174,7 +178,7 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
       }
 
       input = opusData + Nbbytessum;
-      NRF_LOG_INFO("input:%x,%x", *input, input);
+      NRF_LOG_INFO("input:%x,%x, Length: %d", *input, input, NBbytes[sendLoopCnt]);
       do{
          err = sendUdp(thread_ot_instance_get(), input, NBbytes[sendLoopCnt]);
          if(errorloop == SENDTRIAL)
@@ -289,6 +293,18 @@ void setI2SBuffer()
  * @section Main
  **************************************************************************************************/
 
+void getOpusPacketHeader(unsigned char *header, uint8_t headerSize)
+{
+   //uint8_t headerSize = 1 + 1 + OPUSPACKETPERREQUEST * 2;   //1Byte Typ, 1 Byte Size, 2 Byte/Framesize
+   header[0] = 0xff;                   //Typ
+   header[1] = OPUSPACKETPERREQUEST;   //Size
+   for(int i = 2; i < headerSize; i+=2)
+   {
+      //header[i] = 
+   }
+   
+}
+
 int main(int argc, char *argv[])
 {
    int err;
@@ -321,12 +337,10 @@ int main(int argc, char *argv[])
       {
 
          thread_process();
-         app_sched_execute();
+         app_sched_execute();    //Call app_sched_execute() from the main loop each time the application wakes up
+         NRF_LOG_PROCESS(); //display all Logs
 
-         if (NRF_LOG_PROCESS() == false)
-         {
-            thread_sleep();
-         }
+
          /*Frame Request*/  
          if(newFrame)
          {
@@ -346,7 +360,9 @@ int main(int argc, char *argv[])
             {
                NRF_LOG_INFO("I2S Buffer empty");
                NRF_I2S->EVENTS_TXPTRUPD = 0;
-               NRF_I2S->TASKS_STOP = 1;
+               //NRF_I2S->TASKS_STOP = 1;
+               //*((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk failure*/
+               //*((volatile uint32_t *)0x4002503C) = 1;
             }
             else
             {
