@@ -1,16 +1,14 @@
 /*lib for Opos functions created by Tobias*/
 
 #include "opusTobi.h"
+#include "stdbool.h"
+
 //#include "youtube48_8_vbr.c"
 //#include "opusFile.c"
 #include <stdio.h>
 #include <string.h>
-/*
-int NBbytes[] = {249,134,135,258,189,161,161,161,161,161,161,161,161,161,161,161,161,161,161,161,
-                          104,114,207,175,181,162,184,161,161,161,161,145,177,161,161,157,165,152,137,193,
-                          144,179,154,168,161,161,161,161,161,161,161,137,128,161,148,142,166};
-*/
-int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
+
+int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
 {
    //memset(&opus_t->pcm_bytes[bufferNr], '\0', sizeof(opus_t->pcm_bytes[bufferNr]));
    //getopus_decoder_ctl(opus_t->decoder, OPUS_SET_BITRATE(10630));
@@ -48,7 +46,7 @@ int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
    return 1;
 }
 
-int initOpus(struct opus *opus_t)
+int8_t initOpus(struct opus *opus_t)
 {
    int err;
    opus_t->decoder = opus_decoder_create(SAMPLE_RATE, OPUSCHANNELS, &err);
@@ -60,7 +58,7 @@ int initOpus(struct opus *opus_t)
    return 1;
 }
 
-int initOpusFrame(struct frame *frame_t)
+int8_t initOpusFrame(struct frame *frame_t)
 {
    int err;
    frame_t->opus_t->decoder = opus_decoder_create(SAMPLE_RATE, OPUSCHANNELS, &err);
@@ -82,3 +80,66 @@ void getPcm(struct frame *frame_t, uint8_t bufferNr)
    frame_t->loopcnt++;
 }
 
+unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize)
+{
+   //uint8_t headerSize = 1 + 1 + OPUSPACKETPERREQUEST * 2;   //1Byte Typ, 1 Byte Size, 2 Byte/Framesize
+   unsigned char *p;
+   int memorySize = 2 + framecnt * 2;
+
+   p=(unsigned char *) nrf_malloc(memorySize);
+   if(p == NULL)
+   {
+      return NULL;
+   }
+   //NRF_LOG_INFO("malloc memory: %d Bytes", memorySize);
+   uint8_t headerPos = 2;
+   p[0] = OPUSPACKETIDENTIFIER;        //Typ
+   p[1] = framecnt;   //Size
+   for(int i = 0; i < framecnt; i++)
+   {
+      p[headerPos] = (framesize[i] & 0xff);//uint16 var2 = (uint16) ~((unsigned int)var1);
+      p[headerPos+1] = ((framesize[i]>>8) & 0xff);
+      headerPos += 2;
+   }
+   return p;
+}
+
+bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
+{
+   (void)(msgLength);
+   if(!(msgBuffer[0] == OPUSPACKETIDENTIFIER))
+      return false;
+   int framecnt = atoi(&msgBuffer[1]);
+   if((framecnt = 0) || framecnt > OPUSPACKETMAXCNT)
+      return false;
+/*   if(msgLength != 2 + ...)    //correct meassage length?
+      return false;*/
+   return true;
+}
+
+unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
+{
+   if(!isOpusPacket(msgBuffer, msgLength))
+      return NULL;
+   unsigned char *p;
+   p = (unsigned char *) nrf_malloc(msgLength);
+   if(p == NULL)
+   {
+      return NULL;
+   }
+   return p;
+}
+
+unsigned char *getOpusFrameFromPacket(unsigned char *msgBuffer, uint8_t pos)
+{
+   unsigned char *p;
+   int framecnt = atoi(&msgBuffer[1]);
+   if((framecnt = 0) || pos > framecnt)
+      return NULL;
+   int nbbytessum = 0;
+   for(int i=1; i<pos; i++)
+   {
+      nbbytessum += atoi(&msgBuffer[i + 1]);
+   }
+   return p + (2 + framecnt * 2 + nbbytessum);
+}

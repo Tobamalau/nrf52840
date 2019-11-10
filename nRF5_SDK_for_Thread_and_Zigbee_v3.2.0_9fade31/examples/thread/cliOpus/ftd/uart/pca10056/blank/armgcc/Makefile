@@ -52,6 +52,7 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/mdk/system_nrf52840.c \
   $(SDK_ROOT)/components/thread/utils/thread_utils.c \
   $(TOP_ROOT)/src/opus/opusTobi.c \
+  $(SDK_ROOT)/components/libraries/mem_manager/mem_manager.c \
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -92,6 +93,9 @@ INC_FOLDERS += \
   $(SDK_ROOT)/external/nrf_cc310/include \
   $(SDK_ROOT)/components/libraries/timer \
   $(TOP_ROOT)/src/opus/include/opus \
+  $(SDK_ROOT)/components/libraries/queue \
+  $(SDK_ROOT)/components/libraries/cli \
+  $(SDK_ROOT)/components/libraries/mem_manager \
 
 # Libraries common to all targets
 LIB_FILES += \
@@ -156,9 +160,9 @@ LDFLAGS += -Wl,--gc-sections
 LDFLAGS += --specs=nano.specs
 LDFLAGS += -L$(TOP_ROOT)/src/opus/lib
 
-nrf52840_xxaa: CFLAGS += -D__HEAP_SIZE=0
+nrf52840_xxaa: CFLAGS += -D__HEAP_SIZE=256
 nrf52840_xxaa: CFLAGS += -D__STACK_SIZE=8192
-nrf52840_xxaa: ASMFLAGS += -D__HEAP_SIZE=0
+nrf52840_xxaa: ASMFLAGS += -D__HEAP_SIZE=256
 nrf52840_xxaa: ASMFLAGS += -D__STACK_SIZE=8192
 
 # Add standard libraries at the very end of the linker input, after all objects

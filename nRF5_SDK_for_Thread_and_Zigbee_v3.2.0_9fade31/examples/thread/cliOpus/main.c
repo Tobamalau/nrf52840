@@ -52,6 +52,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log.h"
 #include "nrf_log_default_backends.h"
+#include "mem_manager.h"
 
 #include "thread_utils.h"
 
@@ -64,7 +65,7 @@
 #define SCHED_QUEUE_SIZE      32                              /**< Maximum number of events in the scheduler queue. */
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
 #define SENDTRIAL 10                                          /* Maximale Sendeversuche */
-#define OPUSPACKETPERREQUEST 5
+
 
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 static const unsigned char UDP_REQUEST[]   = "r";
@@ -77,6 +78,7 @@ uint32_t Nbbytessum = 0;
 volatile uint8_t FrameRequest = 0;
 uint8_t newFrame = 0;
 uint8_t bufferNr = 0;
+bool Decode = false;
 struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
 const unsigned char *input;
 
@@ -292,29 +294,17 @@ void setI2SBuffer()
 /***************************************************************************************************
  * @section Main
  **************************************************************************************************/
-
-void getOpusPacketHeader(unsigned char *header, uint8_t headerSize)
-{
-   //uint8_t headerSize = 1 + 1 + OPUSPACKETPERREQUEST * 2;   //1Byte Typ, 1 Byte Size, 2 Byte/Framesize
-   header[0] = 0xff;                   //Typ
-   header[1] = OPUSPACKETPERREQUEST;   //Size
-   for(int i = 2; i < headerSize; i+=2)
-   {
-      //header[i] = 
-   }
-   
-}
-
 int main(int argc, char *argv[])
 {
    int err;
-  
+   uint32_t err_code = nrf_mem_init();    //Init Memory Manager vor allocating memory
+   APP_ERROR_CHECK(err_code);
    log_init();
    scheduler_init();    //Scheduler speichert die Events?
    timer_init();
    leds_init();
 
-   uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
+   err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
    APP_ERROR_CHECK(err_code);
 
    /*Init I2S/Opus decoder*/
@@ -325,6 +315,17 @@ int main(int argc, char *argv[])
    err = initOpus(&OpusInstanz);
    if(!err)
       NRF_LOG_INFO("initOpus error");
+
+   unsigned char *p = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[0]);
+   if(p == NULL)
+   {
+      NRF_LOG_INFO("malloc failed");
+      NRF_LOG_PROCESS(); //display all Logs
+      APP_ERROR_CHECK(NRF_ERROR_NULL);
+   }
+   uint16_t test = *(p+3)<<8 | *(p+2);
+   NRF_LOG_INFO("Opusheader-Pointer: &%x, %d, erstre Wert %d",p, *p, test);
+   nrf_free(p);
 
    /*while loop*/
    while (true)

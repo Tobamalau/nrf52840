@@ -4,7 +4,9 @@
 #define OPUS_TOBI_H
 
 #include "opus.h"
+#include "mem_manager.h"
 
+#include <stdlib.h>
 
 #define FRAME_SIZE 960
 #define APPLICATION OPUS_APPLICATION_AUDIO
@@ -14,6 +16,9 @@
 #define MAX_FRAME_SIZE (6*960)
 #define MAX_PACKET_SIZE (3*1276)
 #define SAMPLE_RATE 48000   //input Sample Rate of opus file
+#define OPUSPACKETIDENTIFIER 0xff
+#define OPUSPACKETPERREQUEST 1
+#define OPUSPACKETMAXCNT 10
 
 #define VERBOSE 0
 
@@ -34,9 +39,13 @@ struct frame {
    uint16_t nbbytescnt;
 };
 
-int_fast8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr);
-int initOpus(struct opus *opus_t);
-int initOpusFrame(struct frame *frame_t);
+int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr);
+int8_t initOpus(struct opus *opus_t);
+int8_t initOpusFrame(struct frame *frame_t);
 void getPcm(struct frame *frame_t, uint8_t bufferNr);
+unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize);
+bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength);
+unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength);
+unsigned char *getOpusFrameFromPacket(unsigned char *msgBuffer, uint8_t pos);
 
 #endif
