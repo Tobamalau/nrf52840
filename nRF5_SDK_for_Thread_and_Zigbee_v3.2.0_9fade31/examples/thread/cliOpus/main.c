@@ -75,12 +75,13 @@ int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -
 int16_t Nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
 int16_t sendLoopCnt = 0;
 uint32_t Nbbytessum = 0;
-volatile uint8_t FrameRequest = 0;
-uint8_t newFrame = 0;
 uint8_t bufferNr = 0;
-bool Decode = false;
+bool OpusPackRequ = false;
+bool UpdI2SBuffer = false;
+volatile bool OpusPackRequSend = false;
+
 struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
-const unsigned char *input;
+const unsigned char *input, *MsgBuffer;
 
 void setI2SBuffer();
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
@@ -99,8 +100,8 @@ static void bsp_event_handler(bsp_event_t event)
     {
         case BSP_EVENT_KEY_0:
             NRF_LOG_INFO("Stop Streaming");          
-            FrameRequest = 0;
-            newFrame = 0;
+            OpusPackRequ = false;
+            UpdI2SBuffer = false;
             NRF_I2S->TASKS_START = 0;
             NRF_I2S->TASKS_STOP = 1;
             *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
@@ -115,14 +116,14 @@ static void bsp_event_handler(bsp_event_t event)
 
         case BSP_EVENT_KEY_2:
             NRF_LOG_INFO("Start Streaming");
-            newFrame = 1;        
+            UpdI2SBuffer = true;        
             break;
 
         case BSP_EVENT_KEY_3:
             NRF_LOG_INFO("Button 4 (send all) pressed");
             int16_t nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
             uint32_t nbbytessum = 0;
-            const unsigned char *input = opusData;
+            input = opusData;
             
             for(int i = 0; i<nbbytescnt; i++)
             {
@@ -156,23 +157,15 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
    NRF_LOG_INFO("UDP Message recived Offset:%d Length:%d\n%s", msgOffset, msgLength, msgBuffer);
    bsp_board_led_invert(1);
    /*nur im ersten Durchlauf*/
-   if(FrameRequest)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
+   if(OpusPackRequSend)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
    {
-      OpusInstanz.input = msgBuffer;
-      OpusInstanz.nbBytes = msgLength;
-      decodeOpusFrame(&OpusInstanz, bufferNr);
-      FrameRequest = 0;
-      newFrame = 0;
-      if(!NRF_I2S->TASKS_START)
-      {
-         setI2SBuffer();
-         NRF_I2S->TASKS_START = 1;
-      }
-      
+      MsgBuffer = saveOpusPacket(msgBuffer, msgLength);
+      OpusPackRequSend = false;
    }
    /*Stream Request empfangen sende n-te Daten*/
    else if(msgBuffer[0] == 0x72)// && otMessageGetLength(aMessage) == 1)      //Problem das alle Teinehmer zurücksenden würden!!
    {
+      uint16_t headerlength = 0;
       if(sendLoopCnt>=Nbbytescnt)
       {
          sendLoopCnt = 0;
@@ -182,7 +175,8 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
       input = opusData + Nbbytessum;
       NRF_LOG_INFO("input:%x,%x, Length: %d", *input, input, NBbytes[sendLoopCnt]);
       do{
-         err = sendUdp(thread_ot_instance_get(), input, NBbytes[sendLoopCnt]);
+         const unsigned char *header = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[sendLoopCnt], &headerlength);
+         err = sendUdpOpusPacket(thread_ot_instance_get(), input, headerlength, header, HEADERMEMSYZE(OPUSPACKETPERREQUEST));
          if(errorloop == SENDTRIAL)
          {
             NRF_LOG_INFO("send failed after %d trial", SENDTRIAL);
@@ -190,8 +184,9 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
          }
          errorloop++;
       }while(err != OT_ERROR_NONE);
-      Nbbytessum += NBbytes[sendLoopCnt];
-      sendLoopCnt++;     
+      Nbbytessum += headerlength;
+      sendLoopCnt+= OPUSPACKETPERREQUEST;  
+         
    }   
 }
 
@@ -287,7 +282,7 @@ void setI2SBuffer()
    NRF_I2S->RXTXD.MAXCNT = 960/2;
    NRF_I2S->EVENTS_TXPTRUPD = 0;
    NRF_I2S->TASKS_START = 1;
-   newFrame = 1;
+   UpdI2SBuffer = 1;
    bufferNr ^= (1 << 0);
 }
 
@@ -316,16 +311,17 @@ int main(int argc, char *argv[])
    if(!err)
       NRF_LOG_INFO("initOpus error");
 
-   unsigned char *p = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[0]);
-   if(p == NULL)
+   uint16_t headerlength = 0;
+   MsgBuffer = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[0], &headerlength);
+   if(MsgBuffer == NULL)
    {
       NRF_LOG_INFO("malloc failed");
       NRF_LOG_PROCESS(); //display all Logs
       APP_ERROR_CHECK(NRF_ERROR_NULL);
    }
-   uint16_t test = *(p+3)<<8 | *(p+2);
-   NRF_LOG_INFO("Opusheader-Pointer: &%x, %d, erstre Wert %d",p, *p, test);
-   nrf_free(p);
+   uint16_t test = *(MsgBuffer+3)<<8 | *(MsgBuffer+2);
+   NRF_LOG_INFO("Opusheader-Pointer: &%x, %d, erstre Wert %d",MsgBuffer, *MsgBuffer, test);
+   nrf_free((unsigned char*)MsgBuffer);
 
    /*while loop*/
    while (true)
@@ -341,23 +337,32 @@ int main(int argc, char *argv[])
          app_sched_execute();    //Call app_sched_execute() from the main loop each time the application wakes up
          NRF_LOG_PROCESS(); //display all Logs
 
-
-         /*Frame Request*/  
-         if(newFrame)
+         /*Opus Packet Request*/
+         if(OpusPackRequ)
          {
-            if(!FrameRequest) //Request sent
+            err = sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
+            if(err == OT_ERROR_NONE)
             {
-               err = sendUdp(thread_ot_instance_get(), UDP_REQUEST, sizeof(UDP_REQUEST));
-               if(err == OT_ERROR_NONE)
-               {
-                  FrameRequest = 1;
-               }
+               OpusPackRequ = true;
+            }
+            OpusPackRequ = false;
+            OpusPackRequSend = true;
+         }
+         /*Update I2S Buffer*/  
+         if(UpdI2SBuffer)
+         {
+            if(MsgBuffer != NULL)
+            {
+               OpusInstanz.input = getOpusFrameFromPacket(MsgBuffer, 1);
+               OpusInstanz.nbBytes = atoi((const char *)&MsgBuffer[1 + 1]);
+               decodeOpusFrame(&OpusInstanz, bufferNr);
+               UpdI2SBuffer = false;
             }
          }        
          /* New I2S buffer*/
          if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
          {
-            if(FrameRequest)  //Request were not served
+            if(OpusPackRequ)  //Request were not served
             {
                NRF_LOG_INFO("I2S Buffer empty");
                NRF_I2S->EVENTS_TXPTRUPD = 0;

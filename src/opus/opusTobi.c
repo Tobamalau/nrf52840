@@ -80,11 +80,11 @@ void getPcm(struct frame *frame_t, uint8_t bufferNr)
    frame_t->loopcnt++;
 }
 
-unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize)
+const unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *payloadlength)
 {
    //uint8_t headerSize = 1 + 1 + OPUSPACKETPERREQUEST * 2;   //1Byte Typ, 1 Byte Size, 2 Byte/Framesize
    unsigned char *p;
-   int memorySize = 2 + framecnt * 2;
+   int memorySize = HEADERMEMSYZE(framecnt);//2 + framecnt * 2;
 
    p=(unsigned char *) nrf_malloc(memorySize);
    if(p == NULL)
@@ -99,17 +99,18 @@ unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize)
    {
       p[headerPos] = (framesize[i] & 0xff);//uint16 var2 = (uint16) ~((unsigned int)var1);
       p[headerPos+1] = ((framesize[i]>>8) & 0xff);
+      *payloadlength += (p[headerPos] + 1)<<8 | (p[headerPos]);
       headerPos += 2;
    }
    return p;
 }
 
-bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
+bool isOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength)
 {
    (void)(msgLength);
    if(!(msgBuffer[0] == OPUSPACKETIDENTIFIER))
       return false;
-   int framecnt = atoi(&msgBuffer[1]);
+   int framecnt = atoi((const char *)&msgBuffer[1]);
    if((framecnt = 0) || framecnt > OPUSPACKETMAXCNT)
       return false;
 /*   if(msgLength != 2 + ...)    //correct meassage length?
@@ -117,7 +118,7 @@ bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
    return true;
 }
 
-unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
+const unsigned char *saveOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength)
 {
    if(!isOpusPacket(msgBuffer, msgLength))
       return NULL;
@@ -130,16 +131,16 @@ unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
    return p;
 }
 
-unsigned char *getOpusFrameFromPacket(unsigned char *msgBuffer, uint8_t pos)
+const unsigned char *getOpusFrameFromPacket(const unsigned char *msgBuffer, uint8_t pos)
 {
    unsigned char *p;
-   int framecnt = atoi(&msgBuffer[1]);
+   int framecnt = atoi((const char *)&msgBuffer[1]);
    if((framecnt = 0) || pos > framecnt)
       return NULL;
    int nbbytessum = 0;
    for(int i=1; i<pos; i++)
    {
-      nbbytessum += atoi(&msgBuffer[i + 1]);
+      nbbytessum += atoi((const char *)&msgBuffer[i + 1]);
    }
    return p + (2 + framecnt * 2 + nbbytessum);
 }

@@ -357,7 +357,7 @@ int sendUdp(otInstance *aInstance, const unsigned char *payload, uint16_t payloa
     if (error != OT_ERROR_NONE && message != NULL)
     {
         NRF_LOG_INFO("Error: otUdpSend %d", error);
-        otMessageFree(message);
+        otMessageFree(message);  //Muss das nicht auch noch gemacht werden????
     }
     return OT_ERROR_NONE;
 }
