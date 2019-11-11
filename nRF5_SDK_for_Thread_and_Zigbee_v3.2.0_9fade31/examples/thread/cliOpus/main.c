@@ -116,7 +116,7 @@ static void bsp_event_handler(bsp_event_t event)
 
         case BSP_EVENT_KEY_2:
             NRF_LOG_INFO("Start Streaming");
-            UpdI2SBuffer = true;        
+            OpusPackRequ = true;        
             break;
 
         case BSP_EVENT_KEY_3:
@@ -159,7 +159,7 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
    /*nur im ersten Durchlauf*/
    if(OpusPackRequSend)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
    {
-      MsgBuffer = saveOpusPacket(msgBuffer, msgLength);
+      //MsgBuffer = saveOpusPacket(msgBuffer, msgLength);
       OpusPackRequSend = false;
    }
    /*Stream Request empfangen sende n-te Daten*/
@@ -171,11 +171,21 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
          sendLoopCnt = 0;
          Nbbytessum = 0;
       }
-
+      otBufferInfo info;
+      otMessageGetBufferInfo(thread_ot_instance_get(), &info);
+      fprintf(stdout ,"Test");
+      NRF_LOG_INFO("Pufferinfo mTotalBuffers:%d, mFreeBuffers:%d, m6loSendBuffers:%d, m6loSendMessages:%d", info.mTotalBuffers, info.mFreeBuffers, info.m6loSendBuffers,  info.m6loSendMessages);
       input = opusData + Nbbytessum;
       NRF_LOG_INFO("input:%x,%x, Length: %d", *input, input, NBbytes[sendLoopCnt]);
+      NRF_LOG_PROCESS(); //display all Logs
+      unsigned char *header = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[sendLoopCnt], &headerlength);
+      if(header == NULL)
+      {
+         NRF_LOG_INFO("malloc failed");
+         NRF_LOG_PROCESS(); //display all Logs
+         APP_ERROR_CHECK(NRF_ERROR_NULL);
+      }
       do{
-         const unsigned char *header = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[sendLoopCnt], &headerlength);
          err = sendUdpOpusPacket(thread_ot_instance_get(), input, headerlength, header, HEADERMEMSYZE(OPUSPACKETPERREQUEST));
          if(errorloop == SENDTRIAL)
          {
@@ -184,9 +194,10 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
          }
          errorloop++;
       }while(err != OT_ERROR_NONE);
+      nrf_free(header);
       Nbbytessum += headerlength;
       sendLoopCnt+= OPUSPACKETPERREQUEST;  
-         
+        
    }   
 }
 
@@ -310,7 +321,7 @@ int main(int argc, char *argv[])
    err = initOpus(&OpusInstanz);
    if(!err)
       NRF_LOG_INFO("initOpus error");
-
+   /*
    uint16_t headerlength = 0;
    MsgBuffer = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[0], &headerlength);
    if(MsgBuffer == NULL)
@@ -322,7 +333,7 @@ int main(int argc, char *argv[])
    uint16_t test = *(MsgBuffer+3)<<8 | *(MsgBuffer+2);
    NRF_LOG_INFO("Opusheader-Pointer: &%x, %d, erstre Wert %d",MsgBuffer, *MsgBuffer, test);
    nrf_free((unsigned char*)MsgBuffer);
-
+   */
    /*while loop*/
    while (true)
    {

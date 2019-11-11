@@ -110,7 +110,7 @@ LIB_FILES += \
   $(SDK_ROOT)/external/openthread/lib/nrf52840/gcc/libopenthread-platform-utils.a \
 
 # Optimization flags
-OPT = -O3 -g3
+OPT = -O1 -g3
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 
@@ -160,9 +160,9 @@ LDFLAGS += -Wl,--gc-sections
 LDFLAGS += --specs=nano.specs
 LDFLAGS += -L$(TOP_ROOT)/src/opus/lib
 
-nrf52840_xxaa: CFLAGS += -D__HEAP_SIZE=256
+nrf52840_xxaa: CFLAGS += -D__HEAP_SIZE=8192
 nrf52840_xxaa: CFLAGS += -D__STACK_SIZE=8192
-nrf52840_xxaa: ASMFLAGS += -D__HEAP_SIZE=256
+nrf52840_xxaa: ASMFLAGS += -D__HEAP_SIZE=8192
 nrf52840_xxaa: ASMFLAGS += -D__STACK_SIZE=8192
 
 # Add standard libraries at the very end of the linker input, after all objects

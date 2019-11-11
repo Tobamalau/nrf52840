@@ -27,6 +27,7 @@
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/nrf_ringbuf.o"
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/nrf_section_iter.o"
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/nrf_strerror.o"
+"Output/thread_cli_ftd_uart_pca10056 Release/Obj/mem_manager.o"
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/nrf_drv_clock.o"
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/nrf_nvic.o"
 "Output/thread_cli_ftd_uart_pca10056 Release/Obj/nrf_nvmc.o"

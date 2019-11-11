@@ -80,7 +80,7 @@ void getPcm(struct frame *frame_t, uint8_t bufferNr)
    frame_t->loopcnt++;
 }
 
-const unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *payloadlength)
+unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *payloadlength)
 {
    //uint8_t headerSize = 1 + 1 + OPUSPACKETPERREQUEST * 2;   //1Byte Typ, 1 Byte Size, 2 Byte/Framesize
    unsigned char *p;
@@ -110,7 +110,7 @@ bool isOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength)
    (void)(msgLength);
    if(!(msgBuffer[0] == OPUSPACKETIDENTIFIER))
       return false;
-   int framecnt = atoi((const char *)&msgBuffer[1]);
+   uint8_t framecnt = *msgBuffer + 1;
    if((framecnt = 0) || framecnt > OPUSPACKETMAXCNT)
       return false;
 /*   if(msgLength != 2 + ...)    //correct meassage length?
@@ -133,14 +133,14 @@ const unsigned char *saveOpusPacket(const unsigned char *msgBuffer, uint16_t msg
 
 const unsigned char *getOpusFrameFromPacket(const unsigned char *msgBuffer, uint8_t pos)
 {
-   unsigned char *p;
-   int framecnt = atoi((const char *)&msgBuffer[1]);
+   const unsigned char *p = msgBuffer;
+   uint8_t framecnt = *msgBuffer + 1;
    if((framecnt = 0) || pos > framecnt)
       return NULL;
-   int nbbytessum = 0;
+   uint16_t nbbytessum = 0;
    for(int i=1; i<pos; i++)
    {
-      nbbytessum += atoi((const char *)&msgBuffer[i + 1]);
+      nbbytessum += (uint16_t)*msgBuffer + i + 1;//atoi((const char *)&msgBuffer[i + 1]); //hier aus 2Byte eine Zahl machen
    }
    return p + (2 + framecnt * 2 + nbbytessum);
 }

@@ -104,6 +104,7 @@ void thread_init_Tobi(otStateChangedCallback handler)
     NRF_LOG_INFO("802.15.4 PAN ID  : 0x%04x", otLinkGetPanId(mp_ot_instance));
     NRF_LOG_INFO("Radio mode:      : %s", otThreadGetLinkMode(mp_ot_instance).mRxOnWhenIdle ?
                                     "rx-on-when-idle" : "rx-off-when-idle");
+    NRF_LOG_DEBUG("Debug Log Info");
 
     
 }
@@ -384,23 +385,39 @@ int sendUdpOpusPacket(otInstance *aInstance, const unsigned char *payload, uint1
     messageInfo.mInterfaceId = OT_NETIF_INTERFACE_ID_THREAD;  //Neccesary for this version of thread in newer version it's not needed
 
     message = otUdpNewMessage(aInstance, NULL);
-    otEXPECT_ACTION(message != NULL, error = OT_ERROR_NO_BUFS);
+    //otEXPECT_ACTION(message != NULL, error = OT_ERROR_NO_BUFS);
+        if (message == NULL || error == OT_ERROR_NO_BUFS)
+    {
+        NRF_LOG_INFO("Error: otUdpSend %d", error);
+        otMessageFree(message);
+    }
 
     error = otMessageAppend(message, header, headerLength);
-    otEXPECT(error == OT_ERROR_NONE);
+    //otEXPECT(error == OT_ERROR_NONE);
+        if (error != OT_ERROR_NONE && message != NULL)
+    {
+        NRF_LOG_INFO("Error: otUdpSend %d", error);
+        otMessageFree(message);
+    }
 
     error = otMessageAppend(message, payload, payloadLength);
-    otEXPECT(error == OT_ERROR_NONE);
+    //otEXPECT(error == OT_ERROR_NONE);
+        if (error != OT_ERROR_NONE && message != NULL)
+    {
+        NRF_LOG_INFO("Error: otUdpSend %d", error);
+        otMessageFree(message);
+    }
 
     error = otUdpSend(&sUdpSocket, message, &messageInfo);
     //error = otUdpSendDatagram(aInstance, message, &messageInfo);
 
- exit:
+ //exit:
     if (error != OT_ERROR_NONE && message != NULL)
     {
         NRF_LOG_INFO("Error: otUdpSend %d", error);
         otMessageFree(message);
     }
+    
     return OT_ERROR_NONE;
 }
 
