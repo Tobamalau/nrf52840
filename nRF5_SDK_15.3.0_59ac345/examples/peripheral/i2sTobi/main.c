@@ -21,12 +21,15 @@
 #include "boards.h"
 #include "app_uart.h"
 #define UART_TX_BUF_SIZE                1024                                         /**< UART TX buffer size. */
-#define UART_RX_BUF_SIZE                256                                         /**< UART RX buffer size. */
+#define UART_RX_BUF_SIZE                1024                                         /**< UART RX buffer size. */
 /*Ende Uart Init*/
+#define VERBOSE 1
 
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 volatile uint16_t timerCnt = 0;
 //int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -23170, -23170, -32768, -32768, -23170, -23170};
+
+void uart_callback(uint8_t * p_data, uint8_t length);
 
 void initI2S()
 {
@@ -79,7 +82,48 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 /**@snippet [Handling the data received over UART] */
 void uart_event_handle(app_uart_evt_t * p_event)
 {
-	// Look at the UART example.
+   static uint8_t data_array[UART_RX_BUF_SIZE];
+   static uint8_t index = 0;
+   uint32_t       err_code;
+
+   switch (p_event->evt_type)
+   {
+      case APP_UART_DATA_READY:
+
+         err_code = app_uart_get(&data_array[index]);
+         index++;
+         if (((data_array[index - 1] == 0x01) && (data_array[index - 2] == 0xff)) || (index >= (UART_RX_BUF_SIZE)))
+         {
+             uart_callback(&data_array[0], index);
+
+             if (err_code != NRF_ERROR_INVALID_STATE)
+             {
+                 APP_ERROR_CHECK(err_code);
+             }
+
+             index = 0;
+         }
+
+
+         break;
+
+      case APP_UART_COMMUNICATION_ERROR:
+         APP_ERROR_HANDLER(p_event->data.error_communication);
+         break;
+
+      case APP_UART_FIFO_ERROR:
+         APP_ERROR_HANDLER(p_event->data.error_code);
+         break;
+
+      default:
+         break;
+   }
+}
+
+void uart_callback(uint8_t * p_data, uint8_t length)
+{
+   printf("Empfange Daten:%x", p_data[0]);
+  // TODO: Process 'data_array' of size 'length'.
 }
 
 /**@brief  Function for initializing the UART module.
@@ -110,10 +154,10 @@ static uint32_t uart_init(void)
 
 int main(void)
 {
+   
    //volatile uint16_t curTime;
    uint32_t err_t;
    err_t = uart_init();
-   printf("\n\nUart Init:%ld\n", err_t);
    initI2S();
    /*Timer Init*/
    uint32_t time_ms = 1; //Time(in miliseconds) between consecutive compare events.
@@ -139,8 +183,11 @@ int main(void)
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
    FrameInstanz.nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
    initOpusFrame(&FrameInstanz);
- 
-   printf("Opus                Init\n");
+#if VERBOSE == 1
+   printf("Opus/UART Init\n");
+   NRF_LOG_INFO("NRF_LOG_INFO");
+#endif
+
 
    FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
    FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
@@ -160,31 +207,36 @@ int main(void)
    while (1)
    {
 
-    //__WFE();
-    while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
-    //while (4>FrameInstanz.loopcnt)
-    {
-       if(newFrame)
-       {
-          //printf("\ngetPcm bufferNr:%d", bufferNr);
-          FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
-          FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
-          getPcm(&FrameInstanz, bufferNr);
-          newFrame = 0;
-       }
-       /* New I2S buffer*/
-       if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
-       {
-           //printf("\nEVENT bufferNr:%d\n", bufferNr);
-           printf("\r%d ms", timerCnt);
-           NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
-           timerCnt = 0;
-           NRF_I2S->EVENTS_TXPTRUPD = 0;
-           newFrame = 1;
-           bufferNr ^= (1 << 0);
-       }
-    }
-    FrameInstanz.loopcnt = 0;
-    FrameInstanz.nbbytessum = 0;
-   }
+      //__WFE();
+      while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
+      //while (4>FrameInstanz.loopcnt)
+      {
+         if(newFrame)
+         {
+#if VERBOSE == 2
+             printf("\nnewFrame bufferNr:%d", bufferNr);
+#endif
+             FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
+             FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
+             getPcm(&FrameInstanz, bufferNr);
+             newFrame = 0;
+         }
+         /* New I2S buffer*/
+         if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
+         {
+
+#if VERBOSE == 2
+            //printf("\nEVENTS_TXPTRUPD bufferNr:%d\n", bufferNr);
+            printf("\r%d ms", timerCnt);
+#endif
+            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
+            timerCnt = 0;
+            NRF_I2S->EVENTS_TXPTRUPD = 0;
+            newFrame = 1;
+            bufferNr ^= (1 << 0);
+         }
+      }
+      FrameInstanz.loopcnt = 0;
+      FrameInstanz.nbbytessum = 0;
+      }
 }

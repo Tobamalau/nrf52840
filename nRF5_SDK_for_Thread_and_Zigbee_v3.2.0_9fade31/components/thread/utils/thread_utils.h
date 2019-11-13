@@ -153,4 +153,9 @@ void handleUdpReceive(void *aContext, otMessage *aMessage,
  */
 void setNetworkConfiguration(otInstance *aInstance);
 
+/**
+ * Print all Buffer Infos
+ */
+void printotBufferInfo();
+
 #endif /* THREAD_UTILS_H__ */

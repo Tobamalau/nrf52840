@@ -90,9 +90,10 @@ void thread_init_Tobi(otStateChangedCallback handler)
     NRF_LOG_INFO("Thread version: %s", (uint32_t)otGetVersionString());
     NRF_LOG_INFO("Network name:   %s",
                  (uint32_t)otThreadGetNetworkName(mp_ot_instance));
-    otCliUartInit(mp_ot_instance);
+    //otCliUartInit(mp_ot_instance);
     thread_state_changed_callback_set(handler);
     setNetworkConfiguration(mp_ot_instance);
+    otThreadSetRouterRoleEnabled(mp_ot_instance, false);
 
     error = otIp6SetEnabled(mp_ot_instance, true); /* Start the Thread network interface (CLI cmd > ifconfig up) */
     ASSERT(error == OT_ERROR_NONE);
@@ -105,7 +106,7 @@ void thread_init_Tobi(otStateChangedCallback handler)
     NRF_LOG_INFO("Radio mode:      : %s", otThreadGetLinkMode(mp_ot_instance).mRxOnWhenIdle ?
                                     "rx-on-when-idle" : "rx-off-when-idle");
     NRF_LOG_DEBUG("Debug Log Info");
-
+    
     
 }
 
@@ -391,7 +392,7 @@ int sendUdpOpusPacket(otInstance *aInstance, const unsigned char *payload, uint1
         NRF_LOG_INFO("Error: otUdpSend %d", error);
         otMessageFree(message);
     }
-
+    printotBufferInfo();
     error = otMessageAppend(message, header, headerLength);
     //otEXPECT(error == OT_ERROR_NONE);
         if (error != OT_ERROR_NONE && message != NULL)
@@ -399,7 +400,7 @@ int sendUdpOpusPacket(otInstance *aInstance, const unsigned char *payload, uint1
         NRF_LOG_INFO("Error: otUdpSend %d", error);
         otMessageFree(message);
     }
-
+    printotBufferInfo();
     error = otMessageAppend(message, payload, payloadLength);
     //otEXPECT(error == OT_ERROR_NONE);
         if (error != OT_ERROR_NONE && message != NULL)
@@ -476,6 +477,45 @@ void setNetworkConfiguration(otInstance *aInstance)
 #else
     OT_UNUSED_VARIABLE(aInstance);
 #endif
+}
+void printotBufferInfo()
+{  
+   otBufferInfo info;
+   otMessageGetBufferInfo(thread_ot_instance_get(), &info);
+   NRF_LOG_WARNING("BufferInfo:\nmTotalBuffers:%d\tmFreeBuffers:%d\r\n\
+                              m6loSendMessages:%d\tm6loSendBuffers:%d\r\n\
+                              m6loReassemblyMessages:%d\tm6loReassemblyBuffers:%d\r\n",
+
+   info.mTotalBuffers,
+   info.mFreeBuffers,
+   info.m6loSendMessages,
+   info.m6loSendBuffers,
+   info.m6loReassemblyMessages,
+   info.m6loReassemblyBuffers);
+   NRF_LOG_WARNING("\nmIp6Messages:%d\tmIp6Buffers:%d\r\n\
+                              mMplMessages:%d\tmMplBuffers:%d\r\n\
+                              mMleMessages:%d\tmMleBuffers:%d\r\n",
+
+   info.mIp6Messages,
+   info.mIp6Buffers,
+   info.mMplMessages,
+   info.mMplBuffers,
+   info.mMleMessages,
+   info.mMleBuffers);
+   NRF_LOG_WARNING("\nmArpMessages:%d\tmArpBuffers:%d\r\n\
+                              mCoapMessages:%d\tmCoapBuffers:%d\r\n\
+                              mCoapSecureMessages:%d\tmCoapSecureBuffers:%d\r\n",
+
+   info.mArpMessages,
+   info.mArpBuffers,
+   info.mCoapMessages,
+   info.mCoapBuffers,
+   info.mCoapSecureMessages,
+   info.mCoapSecureBuffers);
+   NRF_LOG_WARNING("\nmApplicationCoapMessages:%d\tmApplicationCoapBuffers:%d\r\n",
+
+   info.mApplicationCoapMessages,
+   info.mApplicationCoapBuffers); 
 }
 
 

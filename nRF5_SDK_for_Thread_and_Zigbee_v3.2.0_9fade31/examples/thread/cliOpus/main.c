@@ -156,6 +156,7 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
    otMessageRead(aMessage, msgOffset, msgBuffer, msgLength);
    NRF_LOG_INFO("UDP Message recived Offset:%d Length:%d\n%s", msgOffset, msgLength, msgBuffer);
    bsp_board_led_invert(1);
+   NRF_LOG_PROCESS(); //display all Logs
    /*nur im ersten Durchlauf*/
    if(OpusPackRequSend)    //Problem, dass nur anfragender Slave neue Daten bekommt!!!
    {
@@ -171,13 +172,13 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
          sendLoopCnt = 0;
          Nbbytessum = 0;
       }
-      otBufferInfo info;
-      otMessageGetBufferInfo(thread_ot_instance_get(), &info);
-      fprintf(stdout ,"Test");
-      NRF_LOG_INFO("Pufferinfo mTotalBuffers:%d, mFreeBuffers:%d, m6loSendBuffers:%d, m6loSendMessages:%d", info.mTotalBuffers, info.mFreeBuffers, info.m6loSendBuffers,  info.m6loSendMessages);
+
+
+      void printotBufferInfo();
+      //NRF_LOG_INFO("Pufferinfo mTotalBuffers:%d, mFreeBuffers:%d, m6loSendBuffers:%d, m6loSendMessages:%d", info.mTotalBuffers, info.mFreeBuffers, info.m6loSendBuffers,  info.m6loSendMessages);
       input = opusData + Nbbytessum;
       NRF_LOG_INFO("input:%x,%x, Length: %d", *input, input, NBbytes[sendLoopCnt]);
-      NRF_LOG_PROCESS(); //display all Logs
+      
       unsigned char *header = getOpusPacketHeader(OPUSPACKETPERREQUEST, &NBbytes[sendLoopCnt], &headerlength);
       if(header == NULL)
       {
@@ -187,6 +188,7 @@ void handleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *
       }
       do{
          err = sendUdpOpusPacket(thread_ot_instance_get(), input, headerlength, header, HEADERMEMSYZE(OPUSPACKETPERREQUEST));
+         NRF_LOG_PROCESS(); //display all Logs
          if(errorloop == SENDTRIAL)
          {
             NRF_LOG_INFO("send failed after %d trial", SENDTRIAL);
@@ -309,6 +311,8 @@ int main(int argc, char *argv[])
    scheduler_init();    //Scheduler speichert die Events?
    timer_init();
    leds_init();
+   printf("printf");
+   fprintf(stdout, "fprintf");
 
    err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
    APP_ERROR_CHECK(err_code);
@@ -339,7 +343,7 @@ int main(int argc, char *argv[])
    {
       thread_init_Tobi(thread_state_changed_callback);
       initUdp(thread_ot_instance_get(), handleUdpReceive);
-
+      
 
       while (!thread_soft_reset_was_requested())
       {

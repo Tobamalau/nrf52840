@@ -21,7 +21,7 @@
 #define OPUSPACKETMAXCNT 10
 #define HEADERMEMSYZE(X) (X * 2 + 2)
 
-#define VERBOSE 0
+
 
 extern int NBbytes[];
 

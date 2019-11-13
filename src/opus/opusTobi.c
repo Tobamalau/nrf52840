@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define VERBOSE 0
+
 int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
 {
    //memset(&opus_t->pcm_bytes[bufferNr], '\0', sizeof(opus_t->pcm_bytes[bufferNr]));

@@ -80,13 +80,13 @@ INC_FOLDERS += \
   $(TOP_ROOT)/src/opus/include/opus \
   $(SDK_ROOT)/components/libraries/uart \
   $(SDK_ROOT)/components/libraries/fifo \
-
+  $(SDK_ROOT)/components/libraries/mem_manager \
 
 # Libraries common to all targets
 LIB_FILES += \
 
 # Optimization flags
-OPT = -O3 -g3
+OPT = -O1 -g3
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 
