@@ -107,7 +107,7 @@ unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *p
    return p;
 }
 
-bool isOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength)
+bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
 {
    (void)(msgLength);
    if(!(msgBuffer[0] == OPUSPACKETIDENTIFIER))
@@ -120,7 +120,7 @@ bool isOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength)
    return true;
 }
 
-const unsigned char *saveOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength)
+unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
 {
    if(!isOpusPacket(msgBuffer, msgLength))
       return NULL;
@@ -130,6 +130,7 @@ const unsigned char *saveOpusPacket(const unsigned char *msgBuffer, uint16_t msg
    {
       return NULL;
    }
+   p = msgBuffer;
    return p;
 }
 

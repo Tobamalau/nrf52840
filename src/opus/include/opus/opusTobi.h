@@ -45,8 +45,8 @@ int8_t initOpus(struct opus *opus_t);
 int8_t initOpusFrame(struct frame *frame_t);
 void getPcm(struct frame *frame_t, uint8_t bufferNr);
 unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *payloadlength);
-bool isOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength);
-const unsigned char *saveOpusPacket(const unsigned char *msgBuffer, uint16_t msgLength);
+bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength);
+unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength);
 const unsigned char *getOpusFrameFromPacket(const unsigned char *msgBuffer, uint8_t pos);
 
 #endif

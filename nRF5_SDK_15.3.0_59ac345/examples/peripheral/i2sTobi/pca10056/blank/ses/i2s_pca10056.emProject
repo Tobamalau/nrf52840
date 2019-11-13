@@ -62,6 +62,7 @@
       <file file_name="../../../../../../components/libraries/uart/retarget.c" />
       <file file_name="../../../../../../components/libraries/uart/app_uart_fifo.c" />
       <file file_name="../../../../../../components/libraries/fifo/app_fifo.c" />
+      <file file_name="../../../../../../components/libraries/mem_manager/mem_manager.c" />
     </folder>
     <folder Name="nRF_Drivers">
       <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_uart.c" />

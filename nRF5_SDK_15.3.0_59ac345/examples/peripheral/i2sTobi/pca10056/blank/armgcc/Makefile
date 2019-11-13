@@ -38,6 +38,7 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uart.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uarte.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_timer.c \
+  $(SDK_ROOT)/components/libraries/mem_manager/mem_manager.c \
   $(PROJ_DIR)/main.c \
   $(TOP_ROOT)/src/opus/opusTobi.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT.c \

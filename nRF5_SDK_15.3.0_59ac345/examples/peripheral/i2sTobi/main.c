@@ -27,9 +27,13 @@
 
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 volatile uint16_t timerCnt = 0;
+const unsigned char *msgBuffer;
+int NbBytes;
+volatile int test = 0;
+bool UpdI2SBuffer = false;
 //int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -23170, -23170, -32768, -32768, -23170, -23170};
 
-void uart_callback(uint8_t * p_data, uint8_t length);
+void uart_callback(uint8_t * p_data, uint16_t length);
 
 void initI2S()
 {
@@ -83,16 +87,24 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 void uart_event_handle(app_uart_evt_t * p_event)
 {
    static uint8_t data_array[UART_RX_BUF_SIZE];
-   static uint8_t index = 0;
+   static uint16_t index = 0;
+   static uint16_t length = 100;
    uint32_t       err_code;
-
+   //memset(&data_array, '\0', sizeof(data_array));
    switch (p_event->evt_type)
    {
       case APP_UART_DATA_READY:
 
          err_code = app_uart_get(&data_array[index]);
          index++;
-         if (((data_array[index - 1] == 0x01) && (data_array[index - 2] == 0xff)) || (index >= (UART_RX_BUF_SIZE)))
+         test++;
+         
+         if(index == 4)
+         {
+            length = ((data_array[2]&0xff) | (data_array[3]<<8)) + 3;
+         }
+         //if (((data_array[index - 2] == 0xff) && (data_array[index - 1] == 0x01)) || (index >= (UART_RX_BUF_SIZE)))
+         if(index > length)
          {
              uart_callback(&data_array[0], index);
 
@@ -120,10 +132,15 @@ void uart_event_handle(app_uart_evt_t * p_event)
    }
 }
 
-void uart_callback(uint8_t * p_data, uint8_t length)
+void uart_callback(uint8_t * p_data, uint16_t length)
 {
-   printf("Empfange Daten:%x", p_data[0]);
-  // TODO: Process 'data_array' of size 'length'.
+   /*printf("Empfange Daten:%x", p_data[0]);*/
+   msgBuffer = saveOpusPacket(p_data, length);
+   NbBytes = length;
+   if(UpdI2SBuffer)
+       APP_ERROR_CHECK(NRF_ERROR_BUSY);
+   UpdI2SBuffer = true;
+   
 }
 
 /**@brief  Function for initializing the UART module.
@@ -158,6 +175,10 @@ int main(void)
    //volatile uint16_t curTime;
    uint32_t err_t;
    err_t = uart_init();
+   APP_ERROR_CHECK(err_t);
+   err_t = nrf_mem_init();    //Init Memory Manager vor allocating memory
+   APP_ERROR_CHECK(err_t);
+   
    initI2S();
    /*Timer Init*/
    uint32_t time_ms = 1; //Time(in miliseconds) between consecutive compare events.
@@ -234,6 +255,11 @@ int main(void)
             NRF_I2S->EVENTS_TXPTRUPD = 0;
             newFrame = 1;
             bufferNr ^= (1 << 0);
+         }
+         if(UpdI2SBuffer)
+         {
+            newFrame = 1;
+            test = 0;
          }
       }
       FrameInstanz.loopcnt = 0;
