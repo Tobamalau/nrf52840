@@ -258,8 +258,11 @@ int main(void)
          }
          if(UpdI2SBuffer)
          {
-            newFrame = 1;
+            //newFrame = 1;
             test = 0;
+            nrf_free(msgBuffer);
+            printf("r");
+            UpdI2SBuffer = false;
          }
       }
       FrameInstanz.loopcnt = 0;
