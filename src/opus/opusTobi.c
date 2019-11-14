@@ -73,13 +73,14 @@ int8_t initOpusFrame(struct frame *frame_t)
    return 1;
 }
 
-void getPcm(struct frame *frame_t, uint8_t bufferNr)
+int8_t getPcm(struct frame *frame_t, uint8_t bufferNr)
 {
    //frame_t->opus_t->input = opusData + frame_t->nbbytessum;
    //frame_t->opus_t->nbBytes = NBbytes[frame_t->loopcnt];
-   decodeOpusFrame(frame_t->opus_t, bufferNr);
+   int8_t err = decodeOpusFrame(frame_t->opus_t, bufferNr);
    frame_t->nbbytessum += frame_t->opus_t->nbBytes;
    frame_t->loopcnt++;
+   return err;
 }
 
 unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *payloadlength)

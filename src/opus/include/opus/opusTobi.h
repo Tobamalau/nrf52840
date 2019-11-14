@@ -43,7 +43,7 @@ struct frame {
 int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr);
 int8_t initOpus(struct opus *opus_t);
 int8_t initOpusFrame(struct frame *frame_t);
-void getPcm(struct frame *frame_t, uint8_t bufferNr);
+int8_t getPcm(struct frame *frame_t, uint8_t bufferNr);
 unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *payloadlength);
 bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength);
 unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength);
