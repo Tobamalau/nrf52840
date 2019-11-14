@@ -24,7 +24,7 @@
 #define UART_RX_BUF_SIZE                1024                                         /**< UART RX buffer size. */
 /*Ende Uart Init*/
 #define VERBOSE 0
-#define EXTMUSIKSOURCE 1
+#define EXTMUSIKSOURCE 0
 
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 volatile uint16_t timerCnt = 0;
@@ -33,6 +33,7 @@ int NbBytes;
 volatile int test = 0;
 volatile bool Tx_empty = false;
 volatile bool UpdI2SBuffer = false;
+static uint8_t data_array[UART_RX_BUF_SIZE];
 //int16_t sine_table[] = { 0, 0, 23170, 23170, 32767, 32767, 23170, 23170, 0, 0, -23170, -23170, -32768, -32768, -23170, -23170};
 
 void uart_callback(uint8_t * p_data, uint16_t length);
@@ -88,7 +89,7 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 /**@snippet [Handling the data received over UART] */
 void uart_event_handle(app_uart_evt_t * p_event)
 {
-   static uint8_t data_array[UART_RX_BUF_SIZE];
+
    static uint16_t index = 0;
    static uint16_t length = 100;
    uint32_t       err_code;
@@ -107,31 +108,31 @@ void uart_event_handle(app_uart_evt_t * p_event)
             Tx_empty = false;
             break;
          }
-
-         err_code = app_uart_get(&data_array[index]);
-         index++;
+         do{
+            err_code = app_uart_get(&data_array[index]);
+            index++;
          
          
-         if(index == 4)
-         {
-            length = ((data_array[2]&0xff) | (data_array[3]<<8)) + 3;
-         }
-         //if (((data_array[index - 2] == 0xff) && (data_array[index - 1] == 0x01)) || (index >= (UART_RX_BUF_SIZE)))
-         if(index > length)
-         {
-             uart_callback(&data_array[0], index);
+            if(index == 4)
+            {
+               length = ((data_array[2]&0xff) | (data_array[3]<<8)) + 3;
+            }
+            //if (((data_array[index - 2] == 0xff) && (data_array[index - 1] == 0x01)) || (index >= (UART_RX_BUF_SIZE)))
+            if(index > length)
+            {
+                uart_callback(&data_array[0], index);
 
-             if (err_code != NRF_ERROR_INVALID_STATE)
-             {
-                 APP_ERROR_CHECK(err_code);
-             }
+                if (err_code != NRF_ERROR_INVALID_STATE)
+                {
+                    APP_ERROR_CHECK(err_code);
+                }
 
-             index = 0;
-         }
-
+                index = 0;
+            }
+         }while(err_code!=NRF_SUCCESS);
 
          break;
-
+#if EXTMUSIKSOURCE
       case APP_UART_COMMUNICATION_ERROR:
          APP_ERROR_HANDLER(p_event->data.error_communication);
          break;
@@ -139,7 +140,7 @@ void uart_event_handle(app_uart_evt_t * p_event)
       case APP_UART_FIFO_ERROR:
          APP_ERROR_HANDLER(p_event->data.error_code);
          break;
-
+#endif
       default:
          break;
    }
@@ -148,9 +149,9 @@ void uart_event_handle(app_uart_evt_t * p_event)
 void uart_callback(uint8_t * p_data, uint16_t length)
 {  test++;
    /*printf("Empfange Daten:%x", p_data[0]);*/
-   msgBuffer = saveOpusPacket(p_data, length);
+/*   msgBuffer = saveOpusPacket(p_data, length);
    if(msgBuffer == NULL)
-      APP_ERROR_CHECK(NRF_ERROR_BUSY);
+      APP_ERROR_CHECK(NRF_ERROR_BUSY);*/
    NbBytes = length;
    if(UpdI2SBuffer)
        APP_ERROR_CHECK(NRF_ERROR_BUSY);
@@ -246,11 +247,12 @@ int main(void)
       {
          if(newFrame)
          {
+#if EXTMUSIKSOURCE
             if(!UpdI2SBuffer)
             {
                APP_ERROR_CHECK(NRF_ERROR_BUSY);
             }
-            
+#endif            
 #if VERBOSE == 2
             printf("\nnewFrame bufferNr:%d", bufferNr);
 #endif
@@ -258,25 +260,24 @@ int main(void)
             FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
             FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];           
 #else 
-            FrameInstanz.opus_t->input = msgBuffer + 4;
+            FrameInstanz.opus_t->input = data_array + 4;//msgBuffer + 4;
             FrameInstanz.opus_t->nbBytes = NbBytes - 4;            
 #endif
-            
+            app_uart_put(0x72);
             if(!getPcm(&FrameInstanz, bufferNr))
                APP_ERROR_CHECK(NRF_ERROR_BUSY);
 
 #if EXTMUSIKSOURCE
-            nrf_free(msgBuffer);
             NbBytes = 0;
             UpdI2SBuffer = false;
             if(NRF_I2S->TASKS_START == 0)
             {
                NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
                NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
-               //NRF_I2S->TASKS_START = 1;
+               NRF_I2S->TASKS_START = 1;
                bufferNr ^= (1 << 0);
             }
-            app_uart_put(0x72);        
+                    
 #endif
             newFrame = 0;
 
@@ -298,7 +299,7 @@ int main(void)
          }
          if(UpdI2SBuffer)
          {
-            //if(NRF_I2S->TASKS_START == 0)
+            if(NRF_I2S->TASKS_START == 0)
                newFrame = 1;
          }
       }

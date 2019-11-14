@@ -125,12 +125,13 @@ unsigned char *saveOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
 {
    if(!isOpusPacket(msgBuffer, msgLength))
       return NULL;
-   unsigned char *p;
+   unsigned char *p = NULL;
    p = (unsigned char *) nrf_malloc(msgLength);
    if(p == NULL)
    {
       return NULL;
    }
+   nrf_free(p);
    p = msgBuffer;
    return p;
 }
