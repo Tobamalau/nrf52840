@@ -111,6 +111,7 @@
       <file file_name="../../../../../../../../external/nRF-IEEE-802.15.4-radio-driver/src/mac_features/ack_generator/nrf_802154_imm_ack_generator.c" />
       <file file_name="../../../../../../../../external/nRF-IEEE-802.15.4-radio-driver/src/platform/temperature/nrf_802154_temperature_none.c" />
     </folder>
+    <configuration Name="Release" gcc_optimization_level="None" />
   </project>
   <configuration
     Name="Release"

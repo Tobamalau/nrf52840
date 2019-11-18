@@ -6,7 +6,7 @@
 #include "nrf_802154.h"
 
 
-#define MAX_MESSAGE_SIZE 63
+#define MAX_MESSAGE_SIZE 70
 #define CHANNEL          11
 
 static volatile bool m_tx_in_progress;
@@ -43,7 +43,18 @@ int main(int argc, char *argv[])
     m_tx_in_progress = false;
     m_tx_done        = false;
 
+   nrf_802154_auto_pending_bit_set(false);
+   bool test = nrf_802154_auto_ack_get();
+   nrf_802154_auto_ack_set(false);
+
+   test = nrf_802154_auto_ack_get();
+
     nrf_802154_init();
+
+
+
+   
+
     nrf_802154_channel_set(CHANNEL);
     nrf_802154_receive();
 
@@ -58,6 +69,10 @@ int main(int argc, char *argv[])
         if (!m_tx_in_progress)
         {
             m_tx_in_progress = nrf_802154_transmit_raw(message, true);
+        }
+        while(1)
+        {
+            m_tx_done = true;
         }
     }
 
