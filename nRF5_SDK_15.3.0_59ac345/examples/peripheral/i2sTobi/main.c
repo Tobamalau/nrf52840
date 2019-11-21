@@ -18,13 +18,13 @@
 #include "boards.h"
 #include "nrfx_uarte.h"
 
-#define VERBOSE 0
-#define EXTMUSIKSOURCE 1
-#define UARTE_RX_BUFF_SIZE 324
+#define VERBOSE 2
+#define EXTMUSIKSOURCE 0
+#define UARTE_RX_BUFF_SIZE (FRAME_SIZE/3 + 4)
 
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 volatile uint16_t timerCnt = 0;
-int NbBytes;
+
 volatile int test = 0;
 volatile bool Tx_empty = false;
 
@@ -95,7 +95,6 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event,
    switch(p_event->type)
    {
       case NRFX_UARTE_EVT_TX_DONE:  
-         timerCnt = 0;
          
          nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));        
          break;
@@ -103,14 +102,11 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event,
       case NRFX_UARTE_EVT_RX_DONE: 
          InRecive = false;
          UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
-         if(UartBufferLoad != 3)
-            DecodeBufferPos = UarteBufferPos;
-         UarteBufferPos ^= (1 << 0);            //UartBufferLoad &= ~(1 << UarteBufferPos) löschen 
-         
+         UarteBufferPos ^= (1 << 0);            //UartBufferLoad &= ~(1 << UarteBufferPos) löschen          
          if(UartBufferLoad != 3)
          {
             InRecive = true;
-            char txBuffer[] = {'r', 'E', DecodeBufferPos+0x30, UartBufferLoad+0x30, DecodeBufferPos+0x30};
+            char txBuffer[] = {'r', 'E', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30, test+0x30};
             nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
          }
          if(NRF_I2S->TASKS_START == 0)
@@ -184,7 +180,7 @@ int main(void)
    FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
    getPcm(&FrameInstanz, bufferNr);
    NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
-   NRF_I2S->RXTXD.MAXCNT = 960/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+   NRF_I2S->RXTXD.MAXCNT = FRAME_SIZE/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
    NRF_I2S->TASKS_START = 1;
    bufferNr ^= (1 << 0);
 #endif
@@ -194,7 +190,8 @@ int main(void)
 
    InRecive = true;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
-
+   //char txBuffer[] = {'S', 't', 'a', 'r', 't'};
+   //nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
    while (1)
    {
 
@@ -206,9 +203,17 @@ int main(void)
          if(newFrame)
          {
 #if EXTMUSIKSOURCE
-            if(!UartBufferLoad != 0)
+            if(!UartBufferLoad != 0)   //no new Buffer available
             {
-               APP_ERROR_CHECK(NRF_ERROR_BUSY);
+               NRF_I2S->TASKS_START = 0;
+               NRF_I2S->TASKS_STOP = 1;
+               *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
+               *((volatile uint32_t *)0x4002503C) = 1;
+               InRecive = true;
+               newFrame = 0;
+
+               nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
+               //APP_ERROR_CHECK(NRF_ERROR_BUSY);
             }
 #endif            
 #if VERBOSE == 2
@@ -218,20 +223,23 @@ int main(void)
             FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
             FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];           
 #else 
+            test++;
+            if(test == 10)
+               test = 0;
             FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;
-            FrameInstanz.opus_t->nbBytes = 320;//UARTE_RX_BUFF_SIZE - 4;   
+            FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;   
             
-#endif
             UartBufferLoad &= ~(1 << DecodeBufferPos);    //Delet Bufferloadmemory
+            DecodeBufferPos ^= (1 << 0);                  //switch to new Uart Buffer
             if(!InRecive)
             {
                InRecive = true;
-               /*char *buffer;
-               string tmp = "rW";
-               itoa(DecodeBufferPos, buffer, 1);*/
-               char txBuffer[] = {'r', 'W', DecodeBufferPos+0x30, UartBufferLoad+0x30, DecodeBufferPos+0x30};
+               char txBuffer[] = {'r', 'W', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30, test+0x30};
+               
                nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
             }
+#endif
+
             if(!getPcm(&FrameInstanz, bufferNr))
                APP_ERROR_CHECK(NRF_ERROR_BUSY);
 
@@ -239,7 +247,6 @@ int main(void)
 
 #if EXTMUSIKSOURCE
 
-            NbBytes = 0;
             if(NRF_I2S->TASKS_START == 0)
             {
                NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
@@ -263,7 +270,7 @@ int main(void)
             printf("\r%d ms", timerCnt);
 #endif
             NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
-            //timerCnt = 0;
+            timerCnt = 0;
             NRF_I2S->EVENTS_TXPTRUPD = 0;
             newFrame = 1;
             bufferNr ^= (1 << 0);
