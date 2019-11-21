@@ -1,10 +1,10 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <nrf.h>
 
 #include "sdk_config.h"
 #include "opus.h"
 #include "opusTobi.h"
-
 #include "nrf_delay.h"
 #include "app_util_platform.h"
 #include "app_error.h"
@@ -12,12 +12,12 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 #include "youtube48_8_vbr.c"
-
 #include "nrf_drv_timer.h" //Timer
+#include <string.h>
 
 #include "boards.h"
 #include "nrfx_uarte.h"
-/*Ende Uart Init*/
+
 #define VERBOSE 0
 #define EXTMUSIKSOURCE 1
 #define UARTE_RX_BUFF_SIZE 324
@@ -27,7 +27,7 @@ volatile uint16_t timerCnt = 0;
 int NbBytes;
 volatile int test = 0;
 volatile bool Tx_empty = false;
-uint8_t txBuffer[] = {0x72};
+
 
 unsigned char *txUarteBuffer;
 unsigned char rxUarteBuffer[2][UARTE_RX_BUFF_SIZE];
@@ -35,7 +35,7 @@ volatile bool InRecive = false;
 volatile uint8_t UarteBufferPos = 0;
 volatile uint8_t UartBufferLoad = 0;
 volatile uint8_t DecodeBufferPos = 0;
-
+//uint8_t txBuffer[] = {0x72};
 volatile uint8_t newFrame = 0;
 
 nrfx_uarte_t m_uart = NRFX_UARTE_INSTANCE(0);
@@ -110,7 +110,8 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event,
          if(UartBufferLoad != 3)
          {
             InRecive = true;
-            nrfx_uarte_tx(&m_uart, txBuffer, sizeof(txBuffer));
+            char txBuffer[] = {'r', 'E', DecodeBufferPos+0x30, UartBufferLoad+0x30, DecodeBufferPos+0x30};
+            nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
          }
          if(NRF_I2S->TASKS_START == 0)
             newFrame = 1;
@@ -225,7 +226,11 @@ int main(void)
             if(!InRecive)
             {
                InRecive = true;
-               nrfx_uarte_tx(&m_uart, txBuffer, sizeof(txBuffer));
+               /*char *buffer;
+               string tmp = "rW";
+               itoa(DecodeBufferPos, buffer, 1);*/
+               char txBuffer[] = {'r', 'W', DecodeBufferPos+0x30, UartBufferLoad+0x30, DecodeBufferPos+0x30};
+               nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
             }
             if(!getPcm(&FrameInstanz, bufferNr))
                APP_ERROR_CHECK(NRF_ERROR_BUSY);
