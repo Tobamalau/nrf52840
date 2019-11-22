@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <nrf.h>
+#include <string.h>
 
 #include "sdk_config.h"
 #include "opus.h"
@@ -12,14 +13,15 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 #include "youtube48_8_vbr.c"
-#include "nrf_drv_timer.h" //Timer
-#include <string.h>
-
+#include "nrf_drv_timer.h"
 #include "boards.h"
 #include "nrfx_uarte.h"
 
-#define VERBOSE 2
-#define EXTMUSIKSOURCE 0
+#include "nrf_802154_config.h"
+#include "nrf_802154.h"
+
+#define VERBOSE 0
+#define EXTMUSIKSOURCE 1
 #define UARTE_RX_BUFF_SIZE (FRAME_SIZE/3 + 4)
 
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
@@ -66,7 +68,16 @@ void initI2S()
    NRF_I2S->PSEL.SDOUT = (I2S_SDOUT_PIN << I2S_PSEL_SDOUT_PIN_Pos);
 
    NRF_I2S->ENABLE = 1;
-   }
+}
+void stopI2S()
+{
+   NRF_I2S->TASKS_START = 0;
+   NRF_I2S->TASKS_STOP = 1;
+   *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
+   *((volatile uint32_t *)0x4002503C) = 1;
+   //InRecive = true;
+   //nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
+}
 /**
  * @brief Handler for timer events.
  */
@@ -162,9 +173,7 @@ int main(void)
 
    nrf_drv_timer_enable(&TIMER);
          
-  
-   //uint_fast16_t len = 57;
-   
+    
    volatile uint8_t bufferNr = 0;
    struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
@@ -174,102 +183,55 @@ int main(void)
    printf("Opus/UART Init\n");
 #endif
 
-#if !EXTMUSIKSOURCE
-   newFrame = 1;
-   FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
-   FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
-   getPcm(&FrameInstanz, bufferNr);
-   NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
-   NRF_I2S->RXTXD.MAXCNT = FRAME_SIZE/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
-   NRF_I2S->TASKS_START = 1;
-   bufferNr ^= (1 << 0);
-#endif
-
-   // Since we are not updating the TXD pointer, the sine wave will play over and over again.
-   // The TXD pointer can be updated after the EVENTS_TXPTRUPD arrives.
-
    InRecive = true;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
-   //char txBuffer[] = {'S', 't', 'a', 'r', 't'};
-   //nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
    while (1)
    {
-
-      //__WFE();
       while (FrameInstanz.nbbytescnt>FrameInstanz.loopcnt)
-      //while (4>FrameInstanz.loopcnt)
       {
-
          if(newFrame)
          {
-#if EXTMUSIKSOURCE
-            if(!UartBufferLoad != 0)   //no new Buffer available
+            /*no new Buffer available*/
+            if(!UartBufferLoad != 0)   
             {
-               NRF_I2S->TASKS_START = 0;
-               NRF_I2S->TASKS_STOP = 1;
-               *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
-               *((volatile uint32_t *)0x4002503C) = 1;
-               InRecive = true;
+               stopI2S();
                newFrame = 0;
+            }          
 
-               nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
-               //APP_ERROR_CHECK(NRF_ERROR_BUSY);
-            }
-#endif            
-#if VERBOSE == 2
-            printf("\nnewFrame bufferNr:%d", bufferNr);
-#endif
-#if !EXTMUSIKSOURCE
-            FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
-            FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];           
-#else 
-            test++;
-            if(test == 10)
-               test = 0;
             FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;
             FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;   
             
             UartBufferLoad &= ~(1 << DecodeBufferPos);    //Delet Bufferloadmemory
             DecodeBufferPos ^= (1 << 0);                  //switch to new Uart Buffer
+
+            /*new buffer request from Uarte*/
             if(!InRecive)
             {
                InRecive = true;
-               char txBuffer[] = {'r', 'W', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30, test+0x30};
-               
+               char txBuffer[] = {'r', 'W', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30, test+0x30};            
                nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
             }
-#endif
 
             if(!getPcm(&FrameInstanz, bufferNr))
                APP_ERROR_CHECK(NRF_ERROR_BUSY);
 
-             
-
-#if EXTMUSIKSOURCE
-
             if(NRF_I2S->TASKS_START == 0)
             {
                NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
-               NRF_I2S->RXTXD.MAXCNT = FRAME_SIZE/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+               NRF_I2S->RXTXD.MAXCNT = FRAME_SIZE/2;
                NRF_I2S->TASKS_START = 1;
                bufferNr ^= (1 << 0);
             }
-            
-                    
-#endif
             newFrame = 0;
-
-
          }
          /* New I2S buffer*/
          if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
          {
-
 #if VERBOSE == 2
             //printf("\nEVENTS_TXPTRUPD bufferNr:%d\n", bufferNr);
             printf("\r%d ms", timerCnt);
 #endif
-            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];//(uint32_t)&sine_table[0];//
+            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
             timerCnt = 0;
             NRF_I2S->EVENTS_TXPTRUPD = 0;
             newFrame = 1;

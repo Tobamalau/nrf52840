@@ -23,6 +23,7 @@
 !/nRF5_SDK_15.3.0_59ac345/examples/peripheral
 /nRF5_SDK_15.3.0_59ac345/examples/peripheral/*
 !/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sTobi
+!/nRF5_SDK_15.3.0_59ac345/examples/peripheral/i2sUart
 
 # Thead
 nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/components/*

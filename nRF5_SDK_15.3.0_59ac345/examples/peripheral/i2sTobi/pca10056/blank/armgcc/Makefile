@@ -48,8 +48,41 @@ SRC_FILES += \
   $(SDK_ROOT)/components/libraries/fifo/app_fifo.c \
   $(SDK_ROOT)/components/libraries/uart/app_uart_fifo.c \
   $(SDK_ROOT)/components/libraries/uart/retarget.c \
-
-
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_core.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_core_hooks.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_critical_section.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_debug.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_pib.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_rssi.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_rx_buffer.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_timer_coord.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/nrf_802154_csma_ca.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/nrf_802154_delayed_trx.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/nrf_802154_filter.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/nrf_802154_frame_parser.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/nrf_802154_precise_ack_timeout.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/hp_timer/nrf_802154_hp_timer.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/rsch/nrf_802154_rsch.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/rsch/nrf_802154_rsch_crit_sect.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/timer_scheduler/nrf_802154_timer_sched.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_notification_swi.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_priority_drop_swi.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_request_swi.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_swi.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/lp_timer/nrf_802154_lp_timer_nodrv.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/rsch/raal/single_phy/single_phy.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/clock/nrf_802154_clock_nodrv.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/ack_generator/nrf_802154_ack_data.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/ack_generator/nrf_802154_ack_generator.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/ack_generator/nrf_802154_enh_ack_generator.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features/ack_generator/nrf_802154_imm_ack_generator.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/temperature/nrf_802154_temperature_none.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/coex/nrf_802154_wifi_coex_none.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/random/nrf_802154_random_stdlib.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/fal/nrf_802154_fal.c
+#  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_revision.c \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_ack_pending_bit.c \
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -82,6 +115,12 @@ INC_FOLDERS += \
   $(SDK_ROOT)/components/libraries/uart \
   $(SDK_ROOT)/components/libraries/fifo \
   $(SDK_ROOT)/components/libraries/mem_manager \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/rsch/raal \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/mac_features \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/rsch \
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src \
+
+
 
 # Libraries common to all targets
 LIB_FILES += \
