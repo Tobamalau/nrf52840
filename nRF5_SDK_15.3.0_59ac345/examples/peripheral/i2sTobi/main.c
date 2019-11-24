@@ -196,6 +196,7 @@ int main(void)
             {
                stopI2S();
                newFrame = 0;
+               break;
             }          
 
             FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;

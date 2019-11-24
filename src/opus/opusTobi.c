@@ -28,9 +28,15 @@ int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
    printf("\nframe_size:%d, bufferNr:%d\n", frame_size, bufferNr);
    int printcnr = 0;
 #endif
+   int pcmNullCnt = 0;
    for(int i=0;i<OPUSCHANNELS*frame_size;i++)
    {
       opus_t->pcm_bytes[bufferNr][i]=opus_t->out[i];    //Array pcm Bytes kann noch wegrationalisiert werden
+      if(opus_t->out[i] == 0)
+         pcmNullCnt++;
+      if(pcmNullCnt == 10)
+         pcmNullCnt = 0;
+     
 #if VERBOSE
       if(i<128 && i > 16*7+12)
       {
