@@ -27,6 +27,7 @@
 #define NOTIMER 1
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
+#define UARTE_TX_BUFF_SIZE 20
 #define GPIOTE_CHANNEL_0 0
 /*802.15.4 defines*/
 #define MACHEAD         9
@@ -43,6 +44,7 @@ const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 volatile uint16_t timerCnt = 0;
 volatile uint16_t timeIEEEsent = 0;
 volatile uint16_t timeNewFrameSeq = 0;
+volatile uint16_t timelastI2SLoop = 0;
 #endif
 volatile int test = 0;
 volatile bool Tx_empty = false;
@@ -101,11 +103,11 @@ void initPeripheral()
    nrf_gpio_cfg_output(BSP_LED_1);
    nrf_gpio_pin_write(BSP_LED_0, 1);
    nrf_gpio_pin_write(BSP_LED_1, 1);
-   nrf_gpiote_event_configure(GPIOTE_CHANNEL_0, BSP_BUTTON_0, NRF_GPIOTE_POLARITY_TOGGLE); 
+/*   nrf_gpiote_event_configure(GPIOTE_CHANNEL_0, BSP_BUTTON_0, NRF_GPIOTE_POLARITY_TOGGLE); 
    NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN0_Enabled; //Set GPIOTE interrupt register on channel 0
    nrf_gpiote_event_enable(0);
    NVIC_EnableIRQ(GPIOTE_IRQn); //Enable interrupts
-
+*/
 /*#### TIMER ####*/
    #if NOTIMER
    /*Timer Init*/
@@ -132,6 +134,7 @@ void stopI2S()
    NRF_I2S->TASKS_STOP = 1;
    *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
    *((volatile uint32_t *)0x4002503C) = 1;
+   newFrame = 0;
    //UarteInRecive = true;
    //nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
 }
@@ -199,15 +202,10 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
     switch (event_type)
     {
         case NRF_TIMER_EVENT_COMPARE0:
-            if(timerCnt%20 == 0 && I2sInProgress)
-               SendIEEE = true;
             timerCnt++;
-            /*if((timerCnt%200 == 0) && I2sInProgress)
-               timerCnt = 0;*/
             if(timerCnt == 1000)
             {
                timerCnt = 0;
-               //printf("\r1 Sekunde");
             }
             break;
 
@@ -218,12 +216,10 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 }
 #endif
 // Interrupt handler
-void GPIOTE_IRQHandler()
+/*void GPIOTE_IRQHandler()
 {
-/*	  timerCnt = 0;
-	  NRF_GPIOTE->EVENTS_IN[0] = 0;
-          */
-}
+	  NRF_GPIOTE->EVENTS_IN[0] = 0;      
+}*/
 void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
 {
    switch(p_event->type)
@@ -240,8 +236,14 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
          if(UartBufferLoad != 3)
          {
             UarteInRecive = true;
-            char txBuffer[] = {'r', 'E', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30, test+0x30};
+            char txBuffer[UARTE_TX_BUFF_SIZE];
+            memset( txBuffer, '\0', sizeof(txBuffer));
+            sprintf(txBuffer, "rE%d%d%d", DecodeBufferPos, UartBufferLoad, UarteBufferPos);
+            nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
+           
+            /*char txBuffer[] = {'r', 'E', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30};
             nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
+            */
          }
          if(!I2sInProgress)
             newFrame = 1;
@@ -295,43 +297,6 @@ void IEEE802154_init(uint8_t *message)
    nrf_802154_channel_set(CHANNEL);
    nrf_802154_receive();
 }
-char* itoaT(int value, char* result, int base) {
-    // check that the base if valid
-    if (base < 2 || base > 36) { *result = '\0'; return result; }
-
-    char* ptr = result, *ptr1 = result, tmp_char;
-    int tmp_value;
-
-    do {
-            tmp_value = value;
-            value /= base;
-            *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
-    } while ( value );
-
-    // Apply negative sign
-    if (tmp_value < 0) *ptr++ = '-';
-    *ptr-- = '\0';
-    while(ptr1 < ptr) {
-            tmp_char = *ptr;
-            *ptr--= *ptr1;
-            *ptr1++ = tmp_char;
-    }
-    return result;
-}
-/*
-char* itoaT(int val, int base){
-	
-	static char buf[32] = {0};
-	
-	int i = 30;
-	
-	for(; val && i ; --i, val /= base)
-	
-		buf[i] = "0123456789abcdef"[val % base];
-	
-	return &buf[i+1];
-	
-}*/
 int main(void)
 {
    uint32_t err;
@@ -348,11 +313,6 @@ int main(void)
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
    FrameInstanz.nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
    initOpusFrame(&FrameInstanz);
-#if VERBOSE == 1
-   //printf("Opus/UART Init\n");
-   char txBuffer[] = {'S', 't'};
-   nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
-#endif
 
    UarteInRecive = true;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
@@ -365,8 +325,7 @@ int main(void)
             /*no new Buffer available*/
             if(!UartBufferLoad != 0)   
             {
-               stopI2S();
-               newFrame = 0;
+               stopI2S();            
                break;
             }          
 
@@ -388,15 +347,12 @@ int main(void)
             /*new buffer request from Uarte*/
             if(!UarteInRecive && !IEEEReciveActiv)
             {  
-               char tmp[10] = {0};
-               char tmp2[10] = {0};
-               itoaT(timeIEEEsent, tmp, 10); // Zeit von EVENTS_TXPTRUPD bis IEEE Packet gesendet
-               itoaT(timeNewFrameSeq, tmp2, 10); // Zeit von EVENTS_TXPTRUPD bis newFrame Routine abgearbeitet
                UarteInRecive = true;
-               char txBuffer[] = {'r', 'W', DecodeBufferPos+0x30, UartBufferLoad+0x30, UarteBufferPos+0x30, '\t' , *tmp, '\t' , *tmp2};    //test+0x30        
-               nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, sizeof(txBuffer));
+               char txBuffer[UARTE_TX_BUFF_SIZE];
+               memset( txBuffer, 0, sizeof(txBuffer));
+               sprintf(txBuffer, "rW%d%d%d\t%d\t%d\t%d", DecodeBufferPos, UartBufferLoad, UarteBufferPos, timeIEEEsent, timeNewFrameSeq, timelastI2SLoop);
+               nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
             }
-
             if(!getPcm(&FrameInstanz, bufferNr))
                APP_ERROR_CHECK(NRF_ERROR_BUSY);
 
@@ -419,6 +375,7 @@ int main(void)
             //printf("\nEVENTS_TXPTRUPD bufferNr:%d\n", bufferNr);
             printf("\r%d ms", timerCnt);
 #endif
+            timelastI2SLoop = timerCnt; 
             timerCnt = 0;
             NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
             NRF_I2S->EVENTS_TXPTRUPD = 0;
