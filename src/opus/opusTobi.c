@@ -116,14 +116,15 @@ unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *p
 
 bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
 {
-   (void)(msgLength);
+   //(void)(msgLength);
    if(!(msgBuffer[0] == OPUSPACKETIDENTIFIER))
       return false;
-   uint8_t framecnt = *msgBuffer + 1;
-   if((framecnt = 0) || framecnt > OPUSPACKETMAXCNT)
+   uint8_t framecnt = msgBuffer[1];
+   if((framecnt == 0) || framecnt > OPUSPACKETMAXCNT)
       return false;
-/*   if(msgLength != 2 + ...)    //correct meassage length?
-      return false;*/
+   uint16_t length = (msgBuffer[2] & 0xff) | (msgBuffer[3]<<8);
+   if(msgLength != length)    //correct meassage length?
+      return false;
    return true;
 }
 
