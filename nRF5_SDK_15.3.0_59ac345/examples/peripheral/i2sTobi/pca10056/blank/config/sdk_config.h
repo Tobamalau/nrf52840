@@ -482,7 +482,7 @@
 
 
 #ifndef I2S_CONFIG_SDIN_PIN
-#define I2S_CONFIG_SDIN_PIN 28
+#define I2S_CONFIG_SDIN_PIN 26
 #endif
 
 // <o> I2S_CONFIG_MASTER  - Mode
@@ -752,7 +752,7 @@
 // <34340864=> 32MHz/125 
 
 #ifndef NRFX_I2S_CONFIG_MCK_SETUP
-#define NRFX_I2S_CONFIG_MCK_SETUP 536870912
+#define NRFX_I2S_CONFIG_MCK_SETUP 201326592
 #endif
 
 // <o> NRFX_I2S_CONFIG_RATIO  - MCK/LRCK ratio
@@ -768,7 +768,7 @@
 // <8=> 512x 
 
 #ifndef NRFX_I2S_CONFIG_RATIO
-#define NRFX_I2S_CONFIG_RATIO 2000
+#define NRFX_I2S_CONFIG_RATIO 0
 #endif
 
 // <o> NRFX_I2S_CONFIG_IRQ_PRIORITY  - Interrupt priority
@@ -783,7 +783,7 @@
 // <7=> 7 
 
 #ifndef NRFX_I2S_CONFIG_IRQ_PRIORITY
-#define NRFX_I2S_CONFIG_IRQ_PRIORITY 6
+#define NRFX_I2S_CONFIG_IRQ_PRIORITY 4
 #endif
 
 // <e> NRFX_I2S_CONFIG_LOG_ENABLED - Enables logging in the module.

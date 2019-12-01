@@ -120,7 +120,7 @@ bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
    if(!(msgBuffer[0] == OPUSPACKETIDENTIFIER))
       return false;
    uint8_t framecnt = msgBuffer[1];
-   if((framecnt == 0) || framecnt > OPUSPACKETMAXCNT)
+   if((framecnt == 0))
       return false;
    uint16_t length = (msgBuffer[2] & 0xff) | (msgBuffer[3]<<8);
    if(msgLength != length)    //correct meassage length?
