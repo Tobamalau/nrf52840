@@ -7,6 +7,7 @@
 #include "nrf_802154.h"
 #include "nrf_delay.h"
 #include "sampleDate.c"
+#include "nrf_802154_hp_timer.h"
 
 #define MACHEAD         9
 #define PACKHEAD        1
@@ -20,6 +21,10 @@
 
 #define CHANNEL         11
 #define PACKETFRAG      3
+
+#define TEMSTAMP 1
+
+
 
 static volatile bool m_tx_in_progress;
 static volatile bool m_tx_done;
@@ -49,7 +54,7 @@ int main(int argc, char *argv[])
 
    setMacHead(message);
 
-
+   
    m_tx_in_progress = false;
    m_tx_done        = false;
 
@@ -87,14 +92,60 @@ int main(int argc, char *argv[])
          message[MACHEAD] = opusPackFragNb;
 
          m_tx_in_progress = true;
-         nrf_802154_transmit_csma_ca(message, sizeof(message));//nrf_802154_transmit(message, sizeof(message), true);
-         
+
+#if NRF_802154_USE_RAW_API
+         nrf_802154_transmit_csma_ca_raw(message);
+#else
+         nrf_802154_transmit_csma_ca(message, sizeof(message));//nrf_802154_transmit(message, sizeof(message), tendif
+#endif
          opusPackFragNb++;
       }
    }
 return 0;
 }
 
+
+
+void nrf_802154_transmit_failed(const uint8_t * p_frame, nrf_802154_tx_error_t error)
+{
+   m_tx_done = true;
+}
+
+#if NRF_802154_USE_RAW_API
+void nrf_802154_transmitted_raw(const uint8_t * p_frame, uint8_t * p_ack, int8_t power, uint8_t lqi)
+{
+    (void) p_frame;
+    (void) power;
+    (void) lqi;
+
+    m_tx_done = true;
+
+    if (p_ack != NULL)
+    {
+        nrf_802154_buffer_free_raw(p_ack);
+    }
+}
+
+#else
+
+#if TEMSTAMP
+void nrf_802154_transmitted_timestamp(const uint8_t * p_frame, uint8_t * p_ack, uint8_t length, int8_t power, uint8_t lqi, uint32_t time)
+{
+   (void) p_frame;
+   (void) length;
+   (void) power;
+   (void) lqi;
+
+   m_tx_done = true;
+   uint32_t test = nrf_802154_hp_timer_timestamp_get();
+   test = nrf_802154_hp_timer_current_time_get();
+   printf("%d", test);
+   if (p_ack != NULL)
+   {
+     nrf_802154_buffer_free(p_ack);
+   }
+}
+#else
 void nrf_802154_transmitted(const uint8_t * p_frame, uint8_t * p_ack, uint8_t length, int8_t power, uint8_t lqi)
 {
    (void) p_frame;
@@ -109,24 +160,6 @@ void nrf_802154_transmitted(const uint8_t * p_frame, uint8_t * p_ack, uint8_t le
      nrf_802154_buffer_free(p_ack);
    }
 }
+#endif
+#endif
 
-void nrf_802154_transmit_failed(const uint8_t * p_frame, nrf_802154_tx_error_t error)
-{
-   m_tx_done = true;
-}
-/*
-
-void nrf_802154_transmitted_raw(const uint8_t * p_frame, uint8_t * p_ack, int8_t power, uint8_t lqi)
-{
-    (void) p_frame;
-    (void) power;
-    (void) lqi;
-
-    m_tx_done = true;
-
-    if (p_ack != NULL)
-    {
-        nrf_802154_buffer_free_raw(p_ack);
-    }
-}
-*/
