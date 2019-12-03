@@ -26,6 +26,7 @@
 #define VERBOSE 0
 #define TIMER_ENABLE 1
 #define I2SHAL 1
+#define PACKETLOST 1
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
 #define UARTE_TX_BUFF_SIZE 20
@@ -43,6 +44,13 @@
 #if TIMER_ENABLE
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 #endif
+#if PACKETLOST
+volatile bool IEEEPacketIsLost = false;
+volatile bool PacketLossHandleOnOff = true;
+volatile uint16_t IEEELostPacketsCnt = 0;
+volatile uint16_t IEEEConnectionInterrupted = 0;
+#endif
+volatile uint8_t PacketNum = 0;
 volatile uint16_t timerCnt = 0;
 volatile uint16_t timeIEEEsent = 0;
 volatile uint16_t timeNewFrameSeq = 0;
@@ -59,7 +67,7 @@ volatile uint8_t UarteBufferPos = 0;
 volatile uint8_t UartBufferLoad = 0;
 volatile uint8_t DecodeBufferPos = 0;
 char txBuffer[UARTE_TX_BUFF_SIZE];
-volatile uint8_t newFrame = 0;
+volatile bool newFrame = false;
 static volatile bool IEEE802154_tx_in_progress;
 static volatile bool IEEE802154_tx_done;
 static volatile uint32_t IEEE802154_rx_counter;
@@ -141,15 +149,20 @@ void initPeripheral()
    APP_ERROR_CHECK(err);
 /*#### GPIO ####*/
    nrf_gpio_cfg_input(BSP_BUTTON_0,BUTTON_PULL); //Configure button 0 as input
+   nrf_gpio_cfg_input(BSP_BUTTON_1,BUTTON_PULL); //Configure button 0 as input
    nrf_gpio_cfg_output(BSP_LED_0); 
    nrf_gpio_cfg_output(BSP_LED_1);
+   nrf_gpio_cfg_output(BSP_LED_2);
+   nrf_gpio_cfg_output(BSP_LED_3);
    nrf_gpio_pin_write(BSP_LED_0, 1);
    nrf_gpio_pin_write(BSP_LED_1, 1);
-/*   nrf_gpiote_event_configure(GPIOTE_CHANNEL_0, BSP_BUTTON_0, NRF_GPIOTE_POLARITY_TOGGLE); 
+   nrf_gpio_pin_write(BSP_LED_2, 1);
+   nrf_gpio_pin_write(BSP_LED_3, 0);
+   nrf_gpiote_event_configure(GPIOTE_CHANNEL_0, BSP_BUTTON_0, NRF_GPIOTE_POLARITY_LOTOHI); 
    NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN0_Enabled; //Set GPIOTE interrupt register on channel 0
    nrf_gpiote_event_enable(0);
    NVIC_EnableIRQ(GPIOTE_IRQn); //Enable interrupts
-*/
+   
 /*#### TIMER ####*/
    #if TIMER_ENABLE
    /*Timer Init*/
@@ -203,6 +216,7 @@ void IEEE802154_init(uint8_t *message)
    nrf_802154_pan_id_set(pan_id);
    nrf_802154_channel_set(CHANNEL);
    nrf_802154_receive();
+   nrf_802154_tx_power_set(8);
 }
 void stopI2S()
 {
@@ -211,12 +225,13 @@ void stopI2S()
 #if !I2SHAL
    nrf_drv_i2s_stop();
 #else
+   NRF_I2S->EVENTS_TXPTRUPD = 0;
    NRF_I2S->TASKS_START = 0;
    NRF_I2S->TASKS_STOP = 1;
    *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
    *((volatile uint32_t *)0x4002503C) = 1;
 #endif
-   newFrame = 0;
+   newFrame = false;
 }
 void setMacHead(uint8_t *message)
 {
@@ -261,9 +276,9 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    (void) power;
    (void) lqi;
 
-   if (length > MAX_PACKET_SIZE || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - PACKHEAD - 2)))
+   if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - PACKHEAD - 2)))
      goto exit;
-   
+   PacketNum = rxUarteBuffer[UarteBufferPos][1];
    memcpy(rxUarteBuffer[UarteBufferPos], p_data + MACHEAD, (PAYLOAD + PACKHEAD));
    //nrfx_uarte_tx(&m_uart, (uint8_t *)rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
    UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
@@ -271,11 +286,12 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    timeIEEEsent = timerCnt;
    sendStateToUart('I');
    if(!I2sInProgress)
-      newFrame = 1;
+      newFrame = true;
    
    nrf_gpio_pin_toggle(BSP_LED_1);
    IEEE802154_rx_counter++;
-   IEEEReciveActiv = true; //Nur wenn Opus Packet noch abfragen!
+   IEEEReciveActiv = true;
+   IEEEPacketIsLost = false;
    
 exit:
    nrf_802154_buffer_free(p_data);
@@ -305,10 +321,17 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 }
 #endif
 // Interrupt handler
-/*void GPIOTE_IRQHandler()
+void GPIOTE_IRQHandler()
 {
-	  NRF_GPIOTE->EVENTS_IN[0] = 0;      
-}*/
+   memset( txBuffer, 0, sizeof(txBuffer));
+   int length = sprintf(txBuffer, "lostP%d;ConInt%d", IEEELostPacketsCnt, IEEEConnectionInterrupted);
+   txBuffer[length] = '\n';
+   nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
+   NRF_GPIOTE->EVENTS_IN[0] = 0;
+   PacketLossHandleOnOff ^= (1 << 0);
+   nrf_gpio_pin_toggle(BSP_LED_3);
+
+}
 #if !I2SHAL
 static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t status)
 {
@@ -328,7 +351,7 @@ static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t s
    };
    APP_ERROR_CHECK(nrf_drv_i2s_next_buffers_set(&next_buffers));
 
-   newFrame = 1;
+   newFrame = true;
    bufferNr ^= (1 << 0);
 }
 #endif
@@ -342,6 +365,7 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
          break;
 
       case NRFX_UARTE_EVT_RX_DONE: 
+         PacketNum = rxUarteBuffer[UarteBufferPos][1];
          UarteInRecive = false;
          UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
          UarteBufferPos ^= (1 << 0);            //UartBufferLoad &= ~(1 << UarteBufferPos) löschen          
@@ -351,7 +375,7 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
             sendStateToUart('E');
          }
          if(!I2sInProgress && UartBufferLoad == 3)
-            newFrame = 1;
+            newFrame = true;
          break;
 
       case NRFX_UARTE_EVT_ERROR:
@@ -365,17 +389,14 @@ void m_uart_context_callback()
 int main(void)
 {
    initPeripheral();
-
+   
    uint8_t IEEE802154_message[MAX_MESSAGE_SIZE];
    uint8_t opusPackNb = 0;
    IEEE802154_init(IEEE802154_message);
  
-
-//   struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
    initOpusFrame(&FrameInstanz);
 
-   //nrf_802154_hp_timer_current_time_get(
    UarteInRecive = true;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
    while (1)
@@ -385,8 +406,29 @@ int main(void)
          /*no new Buffer available*/
          if(!UartBufferLoad)   
          {
-            stopI2S();            
-            break;
+            if(PacketLossHandleOnOff)
+            {
+#if PACKETLOST
+               if(!IEEEPacketIsLost)
+               {
+                  //nrfx_uarte_rx_abort(&m_uart);
+                  //sendStateToUart('X');
+                  IEEEPacketIsLost = true;
+                  nrf_gpio_pin_toggle(BSP_LED_2);
+                  IEEELostPacketsCnt++;
+                  bufferNr ^= (1 << 0);                  //switch to newest Buffer
+                  newFrame = false;
+               }
+               else
+#endif
+               {
+                  IEEEConnectionInterrupted++;
+                  //sendStateToUart('Z');
+                  stopI2S();    
+                  
+               }
+               continue;   //do not decode
+            }
          }          
 
          FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;
@@ -428,7 +470,7 @@ int main(void)
             I2sInProgress = true;
             bufferNr ^= (1 << 0);
          }
-         newFrame = 0;
+         newFrame = false;
          timeNewFrameSeq = timerCnt;
       }
 #if I2SHAL
@@ -439,17 +481,20 @@ int main(void)
          //printf("\nEVENTS_TXPTRUPD bufferNr:%d\n", bufferNr);
          printf("\r%d ms", timerCnt);
 #endif
-         timelastI2SLoop = timerCnt; 
-         if(timelastI2SLoop == 0)
-           timerCnt = 0; 
-         timerCnt = 0;
-         timeNewFrameSeq = 0;
-         timeIEEEsent = 0;
-         NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
+         if(I2sInProgress)
+         {
+            timelastI2SLoop = timerCnt; 
+            if(timelastI2SLoop == 0)
+              timerCnt = 0; 
+            timerCnt = 0;
+            //timeNewFrameSeq = 0;
+            //timeIEEEsent = 0;
+            NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
+            newFrame = true;
+            bufferNr ^= (1 << 0);
+         }
          NRF_I2S->EVENTS_TXPTRUPD = 0;
-         newFrame = 1;
-         bufferNr ^= (1 << 0);
-      }
+      } 
 #endif
       /*IEEE802.15.4 transmitted*/
       if (IEEE802154_tx_done)
@@ -457,8 +502,10 @@ int main(void)
          IEEE802154_tx_in_progress = false;
          IEEE802154_tx_done   = false;
       }
+      if(!nrf_gpio_pin_read(BSP_BUTTON_1))
+      {
+         IEEELostPacketsCnt = 0;
+         IEEEConnectionInterrupted = 0;
+      }
    }
-   FrameInstanz.loopcnt = 0;
-   FrameInstanz.nbbytessum = 0;
-
 }
