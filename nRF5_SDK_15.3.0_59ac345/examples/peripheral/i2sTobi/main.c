@@ -250,6 +250,7 @@ void sendStateToUart(char id)
    int length = sprintf(txBuffer, "r%c%d%d%d\t%d\t%d\t%d", id, DecodeBufferPos, UartBufferLoad, UarteBufferPos, timeIEEEsent, timeNewFrameSeq, timelastI2SLoop);
    if(id == 'I')
       txBuffer[length] = '\n';
+   nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));      
    nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
 }
 void nrf_802154_transmitted(const uint8_t * p_frame, uint8_t * p_ack, uint8_t length, int8_t power, uint8_t lqi)
@@ -360,8 +361,6 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
    switch(p_event->type)
    {
       case NRFX_UARTE_EVT_TX_DONE:  
-         
-         nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));        
          break;
 
       case NRFX_UARTE_EVT_RX_DONE: 
@@ -411,7 +410,7 @@ int main(void)
 #if PACKETLOST
                if(!IEEEPacketIsLost)
                {
-                  //nrfx_uarte_rx_abort(&m_uart);
+                  nrfx_uarte_rx_abort(&m_uart);
                   //sendStateToUart('X');
                   IEEEPacketIsLost = true;
                   nrf_gpio_pin_toggle(BSP_LED_2);
@@ -425,6 +424,7 @@ int main(void)
                   IEEEConnectionInterrupted++;
                   //sendStateToUart('Z');
                   stopI2S();    
+                  nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
                   
                }
                continue;   //do not decode
@@ -507,5 +507,9 @@ int main(void)
          IEEELostPacketsCnt = 0;
          IEEEConnectionInterrupted = 0;
       }
+      if(nrfx_uarte_tx_in_progress(&m_uart))
+         printf("nrfx_uarte_tx_in_progress");
+      if(nrfx_uarte_rx_ready(&m_uart))
+         printf("nrfx_uarte_rx_in_progress");
    }
 }
