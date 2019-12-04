@@ -12,7 +12,7 @@
 
 int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
 {
-   //memset(&opus_t->pcm_bytes[bufferNr], '\0', sizeof(opus_t->pcm_bytes[bufferNr]));
+   //memset(&opus_t->pcm_bytes[bufferNr], 0, sizeof(opus_t->pcm_bytes[bufferNr]));
    //getopus_decoder_ctl(opus_t->decoder, OPUS_SET_BITRATE(10630));
    int frame_size = opus_decode(opus_t->decoder, opus_t->input, opus_t->nbBytes, opus_t->out, MAX_FRAME_SIZE, 0);
    if (frame_size<0)
@@ -20,8 +20,8 @@ int8_t decodeOpusFrame(struct opus *opus_t, uint8_t bufferNr)
     printf("decoder failed: %s\n", opus_strerror(frame_size));
     return 0;
    }
-   opus_int32 rate;
-   opus_decoder_ctl(opus_t->decoder, OPUS_GET_BITRATE(&rate));
+   //opus_int32 rate;
+   //opus_decoder_ctl(opus_t->decoder, OPUS_GET_BITRATE(&rate));
    //printf("\nOPUS_GET_BITRATE:%ld ", rate);
    /* Convert to little-endian ordering.*/
 #if VERBOSE
@@ -93,9 +93,9 @@ unsigned char *getOpusPacketHeader(uint8_t framecnt, int *framesize, uint16_t *p
 {
    //uint8_t headerSize = 1 + 1 + OPUSPACKETPERREQUEST * 2;   //1Byte Typ, 1 Byte Size, 2 Byte/Framesize
    unsigned char *p;
-   int memorySize = HEADERMEMSYZE(framecnt);//2 + framecnt * 2;
+   //int memorySize = HEADERMEMSYZE(framecnt);//2 + framecnt * 2;
 
-   p=(unsigned char *) nrf_malloc(memorySize);
+   p=(unsigned char *) nrf_malloc(OPUSPACKHEAD);
    if(p == NULL)
    {
       return NULL;
@@ -123,7 +123,7 @@ bool isOpusPacket(unsigned char *msgBuffer, uint16_t msgLength)
    if((framecnt == 0))
       return false;
    uint16_t length = (msgBuffer[2] & 0xff) | (msgBuffer[3]<<8);
-   if(msgLength != length)    //correct meassage length?
+   if((msgLength - OPUSPACKHEAD) != length)    //correct meassage length?
       return false;
    return true;
 }

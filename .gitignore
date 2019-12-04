@@ -51,10 +51,11 @@ nRF5_SDK_for_Thread_and_Zigbee_v3.2.0_9fade31/examples/thread/*
 /nRF52ExtendedAdvertisementsBluetooth5/*
 /nrf51-ble-tutorial-advertising/*
 nrf51-ble-tutorial-advertising/
+/nRF-IEEE-802.15.4-radio-driver/
+
 # And all the file types you're interested in.
 !.gitignore
 !README.md
-!/nRF-IEEE-802.15.4-radio-driver/
 
 *.zip
 *.pdf

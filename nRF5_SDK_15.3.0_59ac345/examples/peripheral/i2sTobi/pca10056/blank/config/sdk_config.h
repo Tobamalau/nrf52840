@@ -783,7 +783,7 @@
 // <7=> 7 
 
 #ifndef NRFX_I2S_CONFIG_IRQ_PRIORITY
-#define NRFX_I2S_CONFIG_IRQ_PRIORITY 4
+#define NRFX_I2S_CONFIG_IRQ_PRIORITY 4 //old 4
 #endif
 
 // <e> NRFX_I2S_CONFIG_LOG_ENABLED - Enables logging in the module.

@@ -21,24 +21,27 @@
 
 #include "nrf_802154_config.h"
 #include "nrf_802154.h"
+//#include "youtube48_8_vbr.c"
+#include "youtube48_2_cbr.c"
 
 /*###CONFIG###*/
 #define VERBOSE 0
 #define TIMER_ENABLE 1
 #define I2SHAL 1
 #define PACKETLOST 1
+#define EXTMUSIKSOURCE 0
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
 #define UARTE_TX_BUFF_SIZE 20
 #define GPIOTE_CHANNEL_0 0
 /*802.15.4 defines*/
 #define MACHEAD         9
-#define PACKHEAD        4
-#define PAYLOAD         UARTE_RX_BUFF_SIZE - PACKHEAD//107 
+//#define OPUSPACKHEAD        4
+#define PAYLOAD         UARTE_RX_BUFF_SIZE - OPUSPACKHEAD//107 
 #define DESTINATIONPAN  0x1234
 #define DESTINATION     0x5678
 #define SOURCE          0x0001
-#define MAX_MESSAGE_SIZE (MACHEAD + PACKHEAD + PAYLOAD)
+#define MAX_MESSAGE_SIZE (MACHEAD + OPUSPACKHEAD + PAYLOAD)
 #define CHANNEL         11
 
 #if TIMER_ENABLE
@@ -79,6 +82,8 @@ void m_uart_context_callback();
 void setMacHead(uint8_t *message);
 void stopI2S();
 uint8_t uarte_init();
+void toggleBuffer(volatile uint8_t *buffer);
+
 #if !I2SHAL
 static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t status);
 #endif
@@ -277,10 +282,10 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    (void) power;
    (void) lqi;
 
-   if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - PACKHEAD - 2)))
+   if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - 2)))
      goto exit;
    PacketNum = rxUarteBuffer[UarteBufferPos][1];
-   memcpy(rxUarteBuffer[UarteBufferPos], p_data + MACHEAD, (PAYLOAD + PACKHEAD));
+   memcpy(rxUarteBuffer[UarteBufferPos], p_data + MACHEAD, (PAYLOAD + OPUSPACKHEAD));
    //nrfx_uarte_tx(&m_uart, (uint8_t *)rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
    UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
    UarteBufferPos ^= (1 << 0);            //UartBufferLoad &= ~(1 << UarteBufferPos) löschen    
@@ -353,7 +358,8 @@ static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t s
    APP_ERROR_CHECK(nrf_drv_i2s_next_buffers_set(&next_buffers));
 
    newFrame = true;
-   bufferNr ^= (1 << 0);
+   toggleBuffer(&bufferNr);
+   //bufferNr ^= (1 << 0);
 }
 #endif
 void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
@@ -364,6 +370,8 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
          break;
 
       case NRFX_UARTE_EVT_RX_DONE: 
+         if(!isOpusPacket(rxUarteBuffer[UarteBufferPos], UARTE_RX_BUFF_SIZE))
+            PacketNum = 0;
          PacketNum = rxUarteBuffer[UarteBufferPos][1];
          UarteInRecive = false;
          UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
@@ -385,16 +393,37 @@ void m_uart_context_callback()
 {
 
 }
+void toggleBuffer(volatile uint8_t *buffer)
+{
+   (*buffer)++;
+   if(*buffer == 3)
+      *buffer = 0;
+}
 int main(void)
 {
    initPeripheral();
    
    uint8_t IEEE802154_message[MAX_MESSAGE_SIZE];
-   uint8_t opusPackNb = 0;
+   
    IEEE802154_init(IEEE802154_message);
  
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
    initOpusFrame(&FrameInstanz);
+
+#if EXTMUSIKSOURCE
+   newFrame = 1;
+   FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
+   FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
+   getPcm(&FrameInstanz, bufferNr);
+   NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
+   NRF_I2S->RXTXD.MAXCNT = FRAME_SIZE/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
+   NRF_I2S->TASKS_START = 1;
+   toggleBuffer(&bufferNr);
+   //bufferNr ^= (1 << 0);
+   UartBufferLoad = 3;
+#else 
+   uint8_t opusPackNb = 0;
+#endif
 
    UarteInRecive = true;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
@@ -415,7 +444,8 @@ int main(void)
                   IEEEPacketIsLost = true;
                   nrf_gpio_pin_toggle(BSP_LED_2);
                   IEEELostPacketsCnt++;
-                  bufferNr ^= (1 << 0);                  //switch to newest Buffer
+                  toggleBuffer(&bufferNr);                 //switch to newest Buffer
+                  //bufferNr ^= (1 << 0);                  //switch to newest Buffer
                   newFrame = false;
                }
                else
@@ -429,14 +459,19 @@ int main(void)
                }
                continue;   //do not decode
             }
-         }          
-
+         }                  
+#if EXTMUSIKSOURCE
+            FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
+            FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];           
+#else 
+         if(!isOpusPacket(rxUarteBuffer[DecodeBufferPos], UARTE_RX_BUFF_SIZE))
+            PacketNum = 0;
          FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;
          FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;  
          /*IEEE802.15.4 transmitt*/
          if (!IEEE802154_tx_in_progress && !IEEEReciveActiv)
          {
-            memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[DecodeBufferPos], (PAYLOAD + PACKHEAD));
+            memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[DecodeBufferPos], (PAYLOAD + OPUSPACKHEAD));
             IEEE802154_message[2] = opusPackNb;
             IEEE802154_tx_in_progress = true;
             nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
@@ -451,9 +486,10 @@ int main(void)
             UarteInRecive = true;
             sendStateToUart('W');
          }
+#endif
          if(!getPcm(&FrameInstanz, bufferNr))
             APP_ERROR_CHECK(NRF_ERROR_BUSY);
-
+//#if !EXTMUSIKSOURCE
          if(!I2sInProgress)
          {
 #if !I2SHAL
@@ -468,11 +504,14 @@ int main(void)
             NRF_I2S->TASKS_START = 1;
 #endif
             I2sInProgress = true;
-            bufferNr ^= (1 << 0);
+            toggleBuffer(&bufferNr);
+            //bufferNr ^= (1 << 0);
          }
+//#endif
          newFrame = false;
          timeNewFrameSeq = timerCnt;
       }
+
 #if I2SHAL
       /* New I2S buffer*/
       if(NRF_I2S->EVENTS_TXPTRUPD  != 0)
@@ -483,15 +522,27 @@ int main(void)
 #endif
          if(I2sInProgress)
          {
+#if EXTMUSIKSOURCE
+            sendStateToUart('A');
+#endif
             timelastI2SLoop = timerCnt; 
             if(timelastI2SLoop == 0)
               timerCnt = 0; 
             timerCnt = 0;
-            //timeNewFrameSeq = 0;
-            //timeIEEEsent = 0;
+            int cnt = 0;
+            for(int j=0;j<960;j++)
+            {
+               if(OpusInstanz.pcm_bytes[bufferNr][j] == 0)
+                  cnt++;
+               if(cnt == 10)
+                  printf("Nulldaten");
+            }
+
             NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
             newFrame = true;
-            bufferNr ^= (1 << 0);
+            toggleBuffer(&bufferNr);
+            //bufferNr ^= (1 << 0);
+            //memset( OpusInstanz.pcm_bytes[bufferNr], 0, sizeof(OpusInstanz.pcm_bytes[bufferNr])); //del old buffer
          }
          NRF_I2S->EVENTS_TXPTRUPD = 0;
       } 
