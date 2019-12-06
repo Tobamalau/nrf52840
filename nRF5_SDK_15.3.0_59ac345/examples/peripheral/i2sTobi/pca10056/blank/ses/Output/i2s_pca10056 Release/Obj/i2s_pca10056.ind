@@ -26,6 +26,8 @@
 "Output/i2s_pca10056 Release/Obj/nrfx_timer.o"
 "Output/i2s_pca10056 Release/Obj/nrfx_uarte.o"
 "Output/i2s_pca10056 Release/Obj/nrfx_prs.o"
+"Output/i2s_pca10056 Release/Obj/nrfx_twi.o"
+"Output/i2s_pca10056 Release/Obj/nrf_drv_twi.o"
 "Output/i2s_pca10056 Release/Obj/main.o"
 "Output/i2s_pca10056 Release/Obj/SEGGER_RTT.o"
 "Output/i2s_pca10056 Release/Obj/SEGGER_RTT_Syscalls_SES.o"

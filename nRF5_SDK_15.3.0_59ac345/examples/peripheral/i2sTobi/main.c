@@ -21,15 +21,15 @@
 
 #include "nrf_802154_config.h"
 #include "nrf_802154.h"
-//#include "youtube48_8_vbr.c"
-#include "youtube48_2_cbr.c"
+
+#include "nrf_drv_twi.h"
 
 /*###CONFIG###*/
 #define VERBOSE 0
 #define TIMER_ENABLE 1
 #define I2SHAL 1
 #define PACKETLOST 1
-#define EXTMUSIKSOURCE 0
+#define I2C_EN 0
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
 #define UARTE_TX_BUFF_SIZE 20
@@ -48,7 +48,7 @@
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 #endif
 #if PACKETLOST
-volatile bool IEEEPacketIsLost = false;
+volatile bool PacketIsLost = false;
 volatile bool PacketLossHandleOnOff = true;
 volatile uint16_t IEEELostPacketsCnt = 0;
 volatile uint16_t IEEEConnectionInterrupted = 0;
@@ -66,8 +66,8 @@ unsigned char rxUarteBuffer[2][UARTE_RX_BUFF_SIZE];
 volatile bool UarteInRecive = false;
 volatile bool I2sInProgress = false;
 volatile bool IEEEReciveActiv = false;
-volatile uint8_t UarteBufferPos = 0;
-volatile uint8_t UartBufferLoad = 0;
+volatile uint8_t ReciveBufferPos = 0;
+volatile uint8_t ReciveBufferLoad = 0;
 volatile uint8_t DecodeBufferPos = 0;
 char txBuffer[UARTE_TX_BUFF_SIZE];
 volatile bool newFrame = false;
@@ -75,6 +75,14 @@ static volatile bool IEEE802154_tx_in_progress;
 static volatile bool IEEE802154_tx_done;
 static volatile uint32_t IEEE802154_rx_counter;
 nrfx_uarte_t m_uart = NRFX_UARTE_INSTANCE(0);
+#if I2C_EN
+#define TWI_INSTANCE_ID     0
+#define TDA7901_ADDR          0b1101000
+//#define TDA7901_SUBADDR    
+static const nrf_drv_twi_t m_twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
+static volatile bool m_xfer_done = false;
+static uint8_t m_sample;
+#endif
 
 void timer_event_handler(nrf_timer_event_t event_type, void* p_context);
 void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context);
@@ -88,6 +96,101 @@ void toggleBuffer(volatile uint8_t *buffer);
 static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t status);
 #endif
 
+#if I2C_EN
+void twi_handler(nrf_drv_twi_evt_t const * p_event, void * p_context)
+{
+    switch (p_event->type)
+    {
+        case NRF_DRV_TWI_EVT_DONE:
+            if (p_event->xfer_desc.type == NRF_DRV_TWI_XFER_RX)
+            {
+                printf("Temperature: %d Celsius degrees.", m_sample);
+            }
+            m_xfer_done = true;
+            break;
+         case NRF_DRV_TWI_EVT_ADDRESS_NACK:
+            break;
+        default:
+            break;
+    }
+}
+static void read_sensor_data(uint8_t addr)
+{
+    m_xfer_done = false;
+    ret_code_t err_code;
+
+   //(void) addr;
+     
+    err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, &addr, sizeof(addr), false);
+    APP_ERROR_CHECK(err_code);
+    while (m_xfer_done == false);
+    while (nrf_drv_twi_is_busy(&m_twi));
+    addr++;
+
+ /*   err_code = nrf_drv_twi_rx(&m_twi, TDA7901_ADDR, &m_sample, sizeof(m_sample));
+    APP_ERROR_CHECK(err_code);*/
+
+    err_code = nrf_drv_twi_rx(&m_twi, TDA7901_ADDR, &m_sample, sizeof(m_sample));
+    APP_ERROR_CHECK(err_code);
+    while (m_xfer_done == false);
+    while (nrf_drv_twi_is_busy(&m_twi));
+}
+void twi_init (void)
+{
+    ret_code_t err_code;
+
+    const nrf_drv_twi_config_t twi_lm75b_config = {
+       .scl                = 27,
+       .sda                = 26,
+       .frequency          = NRF_DRV_TWI_FREQ_100K,
+       .interrupt_priority = APP_IRQ_PRIORITY_HIGH,
+       .clear_bus_init     = false
+    };
+
+    err_code = nrf_drv_twi_init(&m_twi, &twi_lm75b_config, twi_handler, NULL);
+    APP_ERROR_CHECK(err_code);
+
+    nrf_drv_twi_enable(&m_twi);
+}
+void TDA7901_set_mode(void)
+{
+   ret_code_t err_code;
+   uint8_t reg[2];
+
+   /* Sample frequency*/
+   reg[0] = 0x03;
+   reg[1] = 0b01000000;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(0x20);
+   /* Amplifier on/off*/
+   reg[0] = 0x07;
+   reg[1] = 0b00000001;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   if(err_code==NRF_ERROR_DRV_TWI_ERR_ANACK)
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   /* Digital Mute off*/
+   reg[0] = 0x02;
+   reg[1] = 0b00011000;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(0x02);
+
+   for(int i=0x20; i<0x42; i++)
+   {
+      read_sensor_data(i);
+   }
+}
+#endif
 void initPeripheral()
 {
    uint32_t err;
@@ -169,7 +272,7 @@ void initPeripheral()
    NVIC_EnableIRQ(GPIOTE_IRQn); //Enable interrupts
    
 /*#### TIMER ####*/
-   #if TIMER_ENABLE
+#if TIMER_ENABLE
    /*Timer Init*/
    uint32_t time_ms = 1; //Time(in miliseconds) between consecutive compare events.
    uint32_t time_ticks;
@@ -183,6 +286,10 @@ void initPeripheral()
       &TIMER, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
 
    nrf_drv_timer_enable(&TIMER);
+#endif
+#if I2C_EN
+   twi_init();
+   TDA7901_set_mode();
 #endif
 }
 uint8_t uarte_init()
@@ -252,10 +359,10 @@ void setMacHead(uint8_t *message)
 void sendStateToUart(char id)
 {
    memset( txBuffer, 0, sizeof(txBuffer));
-   int length = sprintf(txBuffer, "r%c%d%d%d\t%d\t%d\t%d", id, DecodeBufferPos, UartBufferLoad, UarteBufferPos, timeIEEEsent, timeNewFrameSeq, timelastI2SLoop);
+   int length = sprintf(txBuffer, "r%c%d%d%d\t%d\t%d\t%d", id, DecodeBufferPos, ReciveBufferLoad, ReciveBufferPos, timeIEEEsent, timeNewFrameSeq, timelastI2SLoop);
    if(id == 'I')
       txBuffer[length] = '\n';
-   nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));      
+   nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));      
    nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
 }
 void nrf_802154_transmitted(const uint8_t * p_frame, uint8_t * p_ack, uint8_t length, int8_t power, uint8_t lqi)
@@ -284,11 +391,11 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
 
    if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - 2)))
      goto exit;
-   PacketNum = rxUarteBuffer[UarteBufferPos][1];
-   memcpy(rxUarteBuffer[UarteBufferPos], p_data + MACHEAD, (PAYLOAD + OPUSPACKHEAD));
-   //nrfx_uarte_tx(&m_uart, (uint8_t *)rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
-   UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
-   UarteBufferPos ^= (1 << 0);            //UartBufferLoad &= ~(1 << UarteBufferPos) löschen    
+   PacketNum = rxUarteBuffer[ReciveBufferPos][1];
+   memcpy(rxUarteBuffer[ReciveBufferPos], p_data + MACHEAD, (PAYLOAD + OPUSPACKHEAD));
+   //nrfx_uarte_tx(&m_uart, (uint8_t *)rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
+   ReciveBufferLoad |= (1 << ReciveBufferPos); //new decode Buffer available
+   ReciveBufferPos ^= (1 << 0);            //ReciveBufferLoad &= ~(1 << ReciveBufferPos) löschen    
    timeIEEEsent = timerCnt;
    sendStateToUart('I');
    if(!I2sInProgress)
@@ -297,7 +404,7 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    nrf_gpio_pin_toggle(BSP_LED_1);
    IEEE802154_rx_counter++;
    IEEEReciveActiv = true;
-   IEEEPacketIsLost = false;
+   PacketIsLost = false;
    
 exit:
    nrf_802154_buffer_free(p_data);
@@ -359,7 +466,6 @@ static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t s
 
    newFrame = true;
    toggleBuffer(&bufferNr);
-   //bufferNr ^= (1 << 0);
 }
 #endif
 void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
@@ -370,18 +476,21 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
          break;
 
       case NRFX_UARTE_EVT_RX_DONE: 
-         if(!isOpusPacket(rxUarteBuffer[UarteBufferPos], UARTE_RX_BUFF_SIZE))
-            PacketNum = 0;
-         PacketNum = rxUarteBuffer[UarteBufferPos][1];
+         if(!isOpusPacket(rxUarteBuffer[ReciveBufferPos], UARTE_RX_BUFF_SIZE))
+         {
+            sendStateToUart('e');
+            break;
+         }
+         PacketNum = rxUarteBuffer[ReciveBufferPos][1];
          UarteInRecive = false;
-         UartBufferLoad |= (1 << UarteBufferPos); //new decode Buffer available
-         UarteBufferPos ^= (1 << 0);            //UartBufferLoad &= ~(1 << UarteBufferPos) löschen          
-         if(UartBufferLoad != 3)
+         ReciveBufferLoad |= (1 << ReciveBufferPos); //new decode Buffer available
+         ReciveBufferPos ^= (1 << 0);            //ReciveBufferLoad &= ~(1 << ReciveBufferPos) löschen          
+         if(ReciveBufferLoad != 3)
          {
             UarteInRecive = true;
             sendStateToUart('E');
          }
-         if(!I2sInProgress && UartBufferLoad == 3)
+         if(!I2sInProgress && ReciveBufferLoad == 3)
             newFrame = true;
          break;
 
@@ -402,68 +511,59 @@ void toggleBuffer(volatile uint8_t *buffer)
 int main(void)
 {
    initPeripheral();
-   
+
    uint8_t IEEE802154_message[MAX_MESSAGE_SIZE];
-   
    IEEE802154_init(IEEE802154_message);
  
    struct frame FrameInstanz = {&OpusInstanz, 0, 0};
    initOpusFrame(&FrameInstanz);
 
-#if EXTMUSIKSOURCE
-   newFrame = 1;
-   FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
-   FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];
-   getPcm(&FrameInstanz, bufferNr);
-   NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
-   NRF_I2S->RXTXD.MAXCNT = FRAME_SIZE/2;//sizeof(OpusInstanz.pcm_bytes[bufferNr]) / sizeof(uint32_t);
-   NRF_I2S->TASKS_START = 1;
-   toggleBuffer(&bufferNr);
-   //bufferNr ^= (1 << 0);
-   UartBufferLoad = 3;
-#else 
    uint8_t opusPackNb = 0;
-#endif
 
    UarteInRecive = true;
-   nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
+   nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
    while (1)
    {
+      //if(m_xfer_done)
+      //   read_sensor_data();
+
       if(newFrame)
       {
          /*no new Buffer available*/
-         if(!UartBufferLoad)   
+         if(!ReciveBufferLoad)   
          {
             if(PacketLossHandleOnOff)
             {
 #if PACKETLOST
-               if(!IEEEPacketIsLost)
+               if(!PacketIsLost)
                {
-                  nrfx_uarte_rx_abort(&m_uart);
-                  //sendStateToUart('X');
-                  IEEEPacketIsLost = true;
+                  nrfx_uarte_rx_abort(&m_uart);                 
                   nrf_gpio_pin_toggle(BSP_LED_2);
-                  IEEELostPacketsCnt++;
                   toggleBuffer(&bufferNr);                 //switch to newest Buffer
-                  //bufferNr ^= (1 << 0);                  //switch to newest Buffer
                   newFrame = false;
+                  if(IEEEReciveActiv)
+                  {
+                     IEEELostPacketsCnt++;
+                     memset( txBuffer, 0, sizeof(txBuffer));
+                     sprintf(txBuffer, "lost IEEE Pack:%d\n", IEEELostPacketsCnt);
+                     nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
+                  }
+                  else
+                     PacketIsLost = true;
                }
                else
 #endif
                {
                   IEEEConnectionInterrupted++;
-                  //sendStateToUart('Z');
                   stopI2S();    
-                  nrfx_uarte_rx(&m_uart, rxUarteBuffer[UarteBufferPos], sizeof(rxUarteBuffer[UarteBufferPos]));
+                  nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
                   
                }
                continue;   //do not decode
             }
-         }                  
-#if EXTMUSIKSOURCE
-            FrameInstanz.opus_t->input = opusData + FrameInstanz.nbbytessum;
-            FrameInstanz.opus_t->nbBytes = NBbytes[FrameInstanz.loopcnt];           
-#else 
+         }   
+         else
+            IEEELostPacketsCnt = 0;
          if(!isOpusPacket(rxUarteBuffer[DecodeBufferPos], UARTE_RX_BUFF_SIZE))
             PacketNum = 0;
          FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;
@@ -477,7 +577,7 @@ int main(void)
             nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
             opusPackNb++;
          }           
-         UartBufferLoad &= ~(1 << DecodeBufferPos);    //Delet Bufferloadmemory
+         ReciveBufferLoad &= ~(1 << DecodeBufferPos);    //Delet Bufferloadmemory
          DecodeBufferPos ^= (1 << 0);                  //switch to new Uart Buffer
 
          /*new buffer request from Uarte*/
@@ -486,10 +586,10 @@ int main(void)
             UarteInRecive = true;
             sendStateToUart('W');
          }
-#endif
+
          if(!getPcm(&FrameInstanz, bufferNr))
             APP_ERROR_CHECK(NRF_ERROR_BUSY);
-//#if !EXTMUSIKSOURCE
+
          if(!I2sInProgress)
          {
 #if !I2SHAL
@@ -505,9 +605,7 @@ int main(void)
 #endif
             I2sInProgress = true;
             toggleBuffer(&bufferNr);
-            //bufferNr ^= (1 << 0);
          }
-//#endif
          newFrame = false;
          timeNewFrameSeq = timerCnt;
       }
@@ -522,9 +620,6 @@ int main(void)
 #endif
          if(I2sInProgress)
          {
-#if EXTMUSIKSOURCE
-            sendStateToUart('A');
-#endif
             timelastI2SLoop = timerCnt; 
             if(timelastI2SLoop == 0)
               timerCnt = 0; 
@@ -541,8 +636,6 @@ int main(void)
             NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
             newFrame = true;
             toggleBuffer(&bufferNr);
-            //bufferNr ^= (1 << 0);
-            //memset( OpusInstanz.pcm_bytes[bufferNr], 0, sizeof(OpusInstanz.pcm_bytes[bufferNr])); //del old buffer
          }
          NRF_I2S->EVENTS_TXPTRUPD = 0;
       } 
@@ -558,9 +651,5 @@ int main(void)
          IEEELostPacketsCnt = 0;
          IEEEConnectionInterrupted = 0;
       }
-      if(nrfx_uarte_tx_in_progress(&m_uart))
-         printf("nrfx_uarte_tx_in_progress");
-      if(nrfx_uarte_rx_ready(&m_uart))
-         printf("nrfx_uarte_rx_in_progress");
    }
 }

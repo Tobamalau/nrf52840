@@ -39,6 +39,8 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_uarte.c \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_timer.c \
   $(SDK_ROOT)/components/libraries/mem_manager/mem_manager.c \
+  $(SDK_ROOT)/integration/nrfx/legacy/nrf_drv_twi.c \
+  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_twi.c \
   $(PROJ_DIR)/main.c \
   $(TOP_ROOT)/src/opus/opusTobi.c \
   $(SDK_ROOT)/external/segger_rtt/SEGGER_RTT.c \
@@ -80,7 +82,9 @@ SRC_FILES += \
   $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/temperature/nrf_802154_temperature_none.c \
   $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/coex/nrf_802154_wifi_coex_none.c \
   $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/platform/random/nrf_802154_random_stdlib.c \
-  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/fal/nrf_802154_fal.c
+  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/fal/nrf_802154_fal.c \
+
+#  $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_twim.c 
 #  $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_revision.c \
   $(TOP_ROOT)/nRF-IEEE-802.15.4-radio-driver/src/nrf_802154_ack_pending_bit.c \
 

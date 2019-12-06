@@ -81,6 +81,11 @@
       <file file_name="../../../../../../modules/nrfx/drivers/src/prs/nrfx_prs.c">
         <configuration Name="Debug" build_exclude_from_build="No" />
       </file>
+      <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_twi.c" />
+      <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_twim.c">
+        <configuration Name="Release" build_exclude_from_build="Yes" />
+      </file>
+      <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_twi.c" />
     </folder>
     <folder Name="Application">
       <file file_name="../../../main.c" />
