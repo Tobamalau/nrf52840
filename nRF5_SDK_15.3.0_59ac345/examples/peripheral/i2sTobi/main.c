@@ -71,10 +71,10 @@ volatile uint8_t bufferNr = 0;
 struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
 unsigned char rxUarteBuffer[2][UARTE_RX_BUFF_SIZE];
 char txBuffer[UARTE_TX_BUFF_SIZE];
+uint8_t State = 0;
 volatile bool UarteInRecive = false;
 volatile bool I2sInProgress = false;
 volatile bool IEEEReciveActiv = false;
-volatile bool newFrame = false;
 volatile uint8_t ReciveBufferPos = 0;
 volatile uint8_t ReciveBufferLoad = 0;
 volatile uint8_t DecodeBufferPos = 0;
@@ -354,7 +354,7 @@ void stopI2S()
    *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
    *((volatile uint32_t *)0x4002503C) = 1;
 #endif
-   newFrame = false;
+   State = 0;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
                   
 }
@@ -418,7 +418,7 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    timeIEEEsent = timerCnt;
    //sendStateToUart('I');
    if(!I2sInProgress)
-      newFrame = true;
+      State = 1;
    
    nrf_gpio_pin_toggle(BSP_LED_1);
    Counter32[_IEEERECIVED]++;
@@ -484,7 +484,7 @@ static void i2sdata_handler(nrf_drv_i2s_buffers_t const * p_released, uint32_t s
    };
    APP_ERROR_CHECK(nrf_drv_i2s_next_buffers_set(&next_buffers));
 
-   newFrame = true;
+   State = 1;
    toggleBuffer(&bufferNr);
 }
 #endif
@@ -497,7 +497,11 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
 
       case NRFX_UARTE_EVT_RX_DONE: 
          if(!isOpusPacket(rxUarteBuffer[ReciveBufferPos], UARTE_RX_BUFF_SIZE) || IEEEReciveActiv)
+         {
+            nrfx_uarte_rx_abort(&m_uart); 
+            nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
             break;
+         }
          PacketNum = rxUarteBuffer[ReciveBufferPos][1];
          UarteInRecive = false;
          ReciveBufferLoad |= (1 << ReciveBufferPos); //new decode Buffer available
@@ -508,7 +512,7 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
             sendStateToUart('E');
          }
          if(!I2sInProgress && ReciveBufferLoad == 3)
-            newFrame = true;
+            State = 1;
          break;
 
       case NRFX_UARTE_EVT_ERROR:
@@ -543,55 +547,58 @@ int main(void)
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
    while (1)
    {
-      if(newFrame)
+      /*### Statemachine ###*/
+      switch(State)
       {
-         /*no new Buffer available*/
-         if(!ReciveBufferLoad)   
-         {
-            if(!PacketIsLost)
+         case 0:  //Wait
+            break;
+         case 1:  //Buffer check
+            if(!ReciveBufferLoad)   
             {
-               nrfx_uarte_rx_abort(&m_uart);                 
-               nrf_gpio_pin_toggle(BSP_LED_2);
-               toggleBuffer(&bufferNr);                 //switch to newest Buffer
-               newFrame = false;
-               if(IEEEReciveActiv)
+               if(!PacketIsLost)
                {
-                  if(!Counter16[_IEEELOSTPACKET])
+                  nrfx_uarte_rx_abort(&m_uart);                 
+                  nrf_gpio_pin_toggle(BSP_LED_2);
+                  toggleBuffer(&bufferNr);                 //switch to newest Buffer
+                  State = 5;
+                  if(IEEEReciveActiv)
                   {
-                     lastPacketRec = PacketNum;
+                     if(!Counter16[_IEEELOSTPACKET])
+                     {
+                        lastPacketRec = PacketNum;
+                     }
+                     Counter16[_IEEELOSTPACKET]++;
+                     memset( txBuffer2, 0, sizeof(txBuffer2));
+                     sprintf(txBuffer2, "Timestamp:%d\tLostPacketsCnt:%d\n", timerTotalCnt, Counter16[_IEEELOSTPACKET]);
+                     nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
                   }
-                  Counter16[_IEEELOSTPACKET]++;
-                  memset( txBuffer2, 0, sizeof(txBuffer2));
-                  sprintf(txBuffer2, "Timestamp:%d\tLostPacketsCnt:%d\n", timerTotalCnt, Counter16[_IEEELOSTPACKET]);
-                  nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
+                  else
+                     PacketIsLost = true;
                }
                else
-                  PacketIsLost = true;
-            }
-            else
+               {
+                  Counter16[_IEEECONINTERRUPT]++;;
+                  stopI2S();                  
+               }
+            }   
+            else if(Counter16[_IEEELOSTPACKET]>0)
             {
-               Counter16[_IEEECONINTERRUPT]++;;
-               stopI2S();    
-               
-            }
-            continue;   //do not decode
-         }   
-         else if(Counter16[_IEEELOSTPACKET]>0)
-         {
-            memset( txBuffer2, 0, sizeof(txBuffer2));
-            sprintf(txBuffer2, "LastPack:%d\tNewPack:%d\tLost:%d\tNotready:%d\tTotRec:%ld\n", lastPacketRec, PacketNum, (PacketNum-lastPacketRec-1), Counter16[_IEEENOTREADY], Counter32[_IEEERECIVED]);
+               memset( txBuffer2, 0, sizeof(txBuffer2));
+               sprintf(txBuffer2, "LastPack:%d\tNewPack:%d\tLost:%d\tNotready:%d\tTotRec:%ld\n", lastPacketRec, PacketNum, (PacketNum-lastPacketRec-1), Counter16[_IEEENOTREADY], Counter32[_IEEERECIVED]);
 
-            nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
-            Counter16[_IEEELOSTPACKET] = 0;
-         }
-         if(!isOpusPacket(rxUarteBuffer[DecodeBufferPos], UARTE_RX_BUFF_SIZE))
-            continue;
-         FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;//msgBuffer + 4;
-         FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;  
-         /*IEEE802.15.4 transmitt*/
-         if (!IEEE802154_tx_in_progress && !IEEEReciveActiv)
-         {
-            if(!PacketIsLost)
+               nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
+               Counter16[_IEEELOSTPACKET] = 0;
+            }
+            if(!isOpusPacket(rxUarteBuffer[DecodeBufferPos], UARTE_RX_BUFF_SIZE))
+               State = 5;
+            if(IEEEReciveActiv)
+               State = 3;
+            else
+               State = 2;
+            break;
+
+         case 2:  /*### IEEE802.15.4 transmitt ###*/         
+            if (!IEEE802154_tx_in_progress && !IEEEReciveActiv)
             {
                memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[DecodeBufferPos], (PAYLOAD + OPUSPACKHEAD));
                IEEE802154_message[2] = opusPackNb;
@@ -599,27 +606,34 @@ int main(void)
                nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
                if(opusPackNb == 0xff)
                   opusPackNb = 0;
-               //opusPackNb++;
+               State = 3;
             }
-         }
-         else
-            Counter16[_IEEENOTREADY]++;  //just for debugging
+            else
+               Counter16[_IEEENOTREADY]++;  //just for debugging
+            break;
 
-         ReciveBufferLoad &= ~(1 << DecodeBufferPos);    //Delet Bufferloadmemory
-         DecodeBufferPos ^= (1 << 0);                  //switch to new Uart Buffer
+         case 3:  /*### Decode Frame ###*/
+            FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;
+            FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;  
+            ReciveBufferLoad &= ~(1 << DecodeBufferPos);                   //Delet Bufferloadmemory
+            DecodeBufferPos ^= (1 << 0);                                   //switch to new Uart Buffer
 
-         /*new buffer request from Uarte*/
-         if(!UarteInRecive && !IEEEReciveActiv)
-         {  
-            UarteInRecive = true;
-            sendStateToUart('W');
-         }
+            /*new buffer request from Uarte*/
+            if(!UarteInRecive && !IEEEReciveActiv)
+            {  
+               UarteInRecive = true;
+               sendStateToUart('W');
+            }
 
-         if(!getPcm(&FrameInstanz, bufferNr))
-            APP_ERROR_CHECK(NRF_ERROR_BUSY);
+            if(!getPcm(&FrameInstanz, bufferNr))
+               APP_ERROR_CHECK(NRF_ERROR_BUSY);
+            if(!I2sInProgress)
+               State = 4;
+            else
+               State = 5;
+            break;         
 
-         if(!I2sInProgress)
-         {
+         case 4:  /*### Start I2S ###*/
 #if !I2SHAL
             nrf_drv_i2s_buffers_t const initial_buffers = {
                .p_tx_buffer = (uint32_t *)OpusInstanz.pcm_bytes[bufferNr],
@@ -633,9 +647,11 @@ int main(void)
 #endif
             I2sInProgress = true;
             toggleBuffer(&bufferNr);
-         }
-         newFrame = false;
-         timeNewFrameSeq = timerCnt;
+            break;
+         case 5:  /*### Sequence End ###*/
+            timeNewFrameSeq = timerCnt;
+            State = 0;
+            break;                      
       }
 
 #if I2SHAL
@@ -662,7 +678,7 @@ int main(void)
             }
 
             NRF_I2S->TXD.PTR = (uint32_t)OpusInstanz.pcm_bytes[bufferNr];
-            newFrame = true;
+            State = 1;
             toggleBuffer(&bufferNr);
          }
          NRF_I2S->EVENTS_TXPTRUPD = 0;
