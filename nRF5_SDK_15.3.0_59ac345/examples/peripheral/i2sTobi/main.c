@@ -40,7 +40,7 @@
 #define DESTINATION     0x5678
 #define SOURCE          0x0001
 #define MAX_MESSAGE_SIZE (MACHEAD + OPUSPACKHEAD + PAYLOAD)
-#define IEEECHANNEL        11
+#define IEEECHANNEL        25
 #define MAXLOSTPACKETS     5
 
 /*16 Bit Counter*/
@@ -86,7 +86,8 @@ uint8_t opusPackNb = 1;
 nrfx_uarte_t m_uart = NRFX_UARTE_INSTANCE(0);
 #if I2C_EN
 #define TWI_INSTANCE_ID     0
-#define TDA7901_ADDR          0b1101000
+#define TDA7901_ADDR        0b1101010    //0xd4d5,0xd6d7,0xd8d9,0xdadb//0b1101000
+
 //#define TDA7901_SUBADDR    
 static const nrf_drv_twi_t m_twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
 static volatile bool m_xfer_done = false;
@@ -126,15 +127,13 @@ void twi_handler(nrf_drv_twi_evt_t const * p_event, void * p_context)
 static void read_sensor_data(uint8_t addr)
 {
     m_xfer_done = false;
-    ret_code_t err_code;
-
+    ret_code_t err_code;   //0xd4d5,0xd6d7,0xd8d9,0xdadb
    //(void) addr;
      
     err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, &addr, sizeof(addr), false);
     APP_ERROR_CHECK(err_code);
     while (m_xfer_done == false);
     while (nrf_drv_twi_is_busy(&m_twi));
-    addr++;
 
  /*   err_code = nrf_drv_twi_rx(&m_twi, TDA7901_ADDR, &m_sample, sizeof(m_sample));
     APP_ERROR_CHECK(err_code);*/
@@ -165,7 +164,68 @@ void TDA7901_set_mode(void)
 {
    ret_code_t err_code;
    uint8_t reg[2];
+   
+   reg[0] = 0x02;
+   reg[1] = 0b01100010;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
 
+   read_sensor_data(reg[0]);
+
+   /* Sample frequency, 16 Bit*/
+   reg[0] = 0x03;
+   reg[1] = 0b01010100;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(reg[0]);
+
+   /* Channel 1 LOAD 5 R*/
+   reg[0] = 0x11;
+   reg[1] = 0b00010001;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(reg[0]);
+#if 0
+   /* Channel 1 on*/
+   reg[0] = 0x04;
+   reg[1] = 0b00010101;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(reg[0]);
+#endif
+   for(int i=0x0c; i<0x26; i++)
+   {
+      read_sensor_data(i);
+   }
+
+   /* Clear fault*/
+   reg[0] = 0x21;
+   reg[1] = 0b10100000;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(reg[0]);
+
+   for(int i=0x0c; i<0x26; i++)
+   {
+      read_sensor_data(i);
+   }
+#if 0
+   ret_code_t err_code;
+   uint8_t reg[2];
    /* Sample frequency*/
    reg[0] = 0x03;
    reg[1] = 0b01000000;
@@ -198,6 +258,7 @@ void TDA7901_set_mode(void)
    {
       read_sensor_data(i);
    }
+#endif
 }
 #endif
 void initPeripheral()
@@ -594,6 +655,7 @@ int main(void)
                   }
                   else
                   {
+                     lastPacketNumSent = PacketNum;
                      Counter16[_IEEECONINTERRUPT]++;
                      stopI2S();
                      State = 0;
@@ -601,6 +663,7 @@ int main(void)
                }
                else
                {
+                  lastPacketNumSent = PacketNum;
                   nrfx_uarte_rx_abort(&m_uart); 
                   stopI2S(); 
                   State = 0;
