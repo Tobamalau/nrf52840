@@ -421,7 +421,7 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    toggleBuffer(&ReciveBufferPos);   
    timeIEEEsent = timerCnt;
 
-   if(!State)
+   if(!State && ReciveBufferLoad > 1)
       State = 2;
    
    nrf_gpio_pin_toggle(BSP_LED_1);
@@ -432,7 +432,7 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
 
    
    memset( txBuffer2, 0, sizeof(txBuffer2));
-   sprintf(txBuffer2, "RecTimeSt:%d\tPacketNum:%d\n", timerTotalCnt, PacketNum);
+   sprintf(txBuffer2, "RecTime:%d\tPackNum:%d\tBufLoad:%d\n", timerTotalCnt, PacketNum, ReciveBufferLoad);
    nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
    
 exit:
@@ -548,6 +548,7 @@ int main(void)
    initOpusFrame(&FrameInstanz);
 
    uint8_t lastPacketRec = 0; 
+   uint8_t lastPacketNumSent = 0;
    uint16_t lastLostPacketCnt = 0; 
 
    UarteInRecive = true;
@@ -587,7 +588,7 @@ int main(void)
                      }
                      Counter16[_IEEELOSTPACKET]++;
                      memset( txBuffer2, 0, sizeof(txBuffer2));
-                     sprintf(txBuffer2, "Timestamp:%d\tLostPack:%d\n", timerTotalCnt, Counter16[_IEEELOSTPACKET]);
+                     sprintf(txBuffer2, "Timest: %d\tLostPack:%d\n", timerTotalCnt, Counter16[_IEEELOSTPACKET]);
                      nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
                      State = 6;
                   }
@@ -626,22 +627,8 @@ int main(void)
             }
             break;
 
-         case 3:  /*### IEEE802.15.4 transmitt ###*/         
-            if (!IEEE802154_tx_in_progress && !IEEEReciveActiv)
-            {
-               memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[DecodeBufferPos], (PAYLOAD + OPUSPACKHEAD));
-               IEEE802154_message[2] = opusPackNb;
-               IEEE802154_tx_in_progress = true;
-               nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
-               if(opusPackNb == 0xff)
-                  opusPackNb = 0;
-               State = 4;
-            }
-            else if(lastPacketRec != opusPackNb)   //just for debugging
-            {
-               Counter16[_IEEENOTREADY]++;  
-               lastPacketRec = opusPackNb;
-            }
+         case 3:         
+            State = 4;
             break;
 
          case 4:  /*### Decode Frame ###*/
@@ -685,6 +672,27 @@ int main(void)
             timeNewFrameSeq = timerCnt;
             State = 1;
             break;                      
+      }
+      if(lastPacketNumSent == 0xff && PacketNum == 0x01)
+         lastPacketNumSent = 0;
+      /*### IEEE802.15.4 transmitt asynchron ###*/  
+      if(!IEEEReciveActiv && (lastPacketNumSent < PacketNum))
+      {
+         if (!IEEE802154_tx_in_progress)
+         {
+            memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[DecodeBufferPos], (PAYLOAD + OPUSPACKHEAD));
+            IEEE802154_message[2] = opusPackNb;
+            IEEE802154_tx_in_progress = true;
+            nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
+            if(opusPackNb == 0xff)
+               opusPackNb = 0;
+            lastPacketNumSent = PacketNum;
+         }
+         else if(lastPacketRec != opusPackNb)   //just for debugging
+         {
+            Counter16[_IEEENOTREADY]++;  
+            lastPacketRec = opusPackNb;
+         }
       }
 
       /*IEEE802.15.4 transmitted*/
