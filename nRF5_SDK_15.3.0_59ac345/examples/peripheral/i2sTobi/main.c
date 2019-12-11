@@ -16,19 +16,20 @@
 #include "nrf_drv_timer.h"
 #include "boards.h"
 #include "nrfx_uarte.h"
-
 #include "nrf_gpiote.h"
-
 #include "nrf_802154_config.h"
 #include "nrf_802154.h"
-
 #include "nrf_drv_twi.h"
+
+//#include "nrf_drv_pwm.h"
+//#include "app_timer.h"
+//#include "nrf_drv_clock.h"
 
 /*###CONFIG###*/
 #define VERBOSE 0
 #define TIMER_ENABLE 1
 #define I2SHAL 1
-#define I2C_EN 0
+#define I2C_EN 1
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
 #define UARTE_TX_BUFF_SIZE 20
@@ -84,6 +85,17 @@ static volatile bool IEEE802154_tx_in_progress;
 static volatile bool IEEE802154_tx_done;
 uint8_t opusPackNb = 1;
 nrfx_uarte_t m_uart = NRFX_UARTE_INSTANCE(0);
+#if 0
+nrf_drv_pwm_t m_pwm0 = NRF_DRV_PWM_INSTANCE(0);
+nrf_pwm_values_individual_t seq_values[] = {{0, 0, 0, 0}};
+nrf_pwm_sequence_t const seq =
+{
+    .values.p_individual = seq_values,
+    .length          = NRF_PWM_VALUES_LENGTH(seq_values),
+    .repeats         = 0,
+    .end_delay       = 0
+};
+#endif
 #if I2C_EN
 #define TWI_INSTANCE_ID     0
 #define TDA7901_ADDR        0b1101010    //0xd4d5,0xd6d7,0xd8d9,0xdadb//0b1101000
@@ -184,6 +196,16 @@ void TDA7901_set_mode(void)
 
    read_sensor_data(reg[0]);
 
+   /* Volume Control*/
+   reg[0] = 0x05;
+   reg[1] = 0x7f;
+   err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
+   APP_ERROR_CHECK(err_code);
+   while (m_xfer_done == false);
+   while (nrf_drv_twi_is_busy(&m_twi));
+
+   read_sensor_data(reg[0]);
+
    /* Channel 1 LOAD 5 R*/
    reg[0] = 0x11;
    reg[1] = 0b00010001;
@@ -193,7 +215,7 @@ void TDA7901_set_mode(void)
    while (nrf_drv_twi_is_busy(&m_twi));
 
    read_sensor_data(reg[0]);
-#if 0
+
    /* Channel 1 on*/
    reg[0] = 0x04;
    reg[1] = 0b00010101;
@@ -203,7 +225,7 @@ void TDA7901_set_mode(void)
    while (nrf_drv_twi_is_busy(&m_twi));
 
    read_sensor_data(reg[0]);
-#endif
+
    for(int i=0x0c; i<0x26; i++)
    {
       read_sensor_data(i);
@@ -275,9 +297,9 @@ void initPeripheral()
    // Enable MCK generator
    NRF_I2S->CONFIG.MCKEN = (I2S_CONFIG_MCKEN_MCKEN_ENABLE << I2S_CONFIG_MCKEN_MCKEN_Pos);
    // MCKFREQ
-   NRF_I2S->CONFIG.MCKFREQ = I2S_CONFIG_MCKFREQ_MCKFREQ_32MDIV21  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
+   NRF_I2S->CONFIG.MCKFREQ = 0x30000000  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
    // Ratio = 96
-   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_32X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
+   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_128X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
    // Master mode, 16Bit, left aligned
    NRF_I2S->CONFIG.MODE = I2S_CONFIG_MODE_MODE_MASTER << I2S_CONFIG_MODE_MODE_Pos;
    NRF_I2S->CONFIG.SWIDTH = I2S_CONFIG_SWIDTH_SWIDTH_16BIT << I2S_CONFIG_SWIDTH_SWIDTH_Pos;
@@ -365,7 +387,35 @@ void initPeripheral()
    twi_init();
    TDA7901_set_mode();
 #endif
-}
+#if 0 
+/*#### PWM ####*/
+    nrf_drv_pwm_config_t const config =
+
+    {
+        .output_pins =
+        {
+            4 | NRF_DRV_PWM_PIN_INVERTED, // channel 0
+            NRF_DRV_PWM_PIN_NOT_USED, // channel 1
+            NRF_DRV_PWM_PIN_NOT_USED, // channel 2
+            NRF_DRV_PWM_PIN_NOT_USED  // channel 3
+        },
+        .irq_priority = APP_IRQ_PRIORITY_LOWEST,
+        .base_clock   = NRF_PWM_CLK_16MHz,
+        .count_mode   = NRF_PWM_MODE_UP,
+        .top_value    = 2,
+        .load_mode    = NRF_PWM_LOAD_INDIVIDUAL,
+        .step_mode    = NRF_PWM_STEP_AUTO
+    };
+
+    nrf_drv_pwm_init(&m_pwm0, &config, NULL);
+
+   seq_values->channel_0 = duty_cycle;
+   nrf_drv_pwm_simple_playback(&m_pwm0, &seq, 1, NRF_DRV_PWM_FLAG_LOOP);
+#endif
+}   
+
+
+/*#### UART ####*/
 uint8_t uarte_init()
 {
     
@@ -408,6 +458,14 @@ void stopI2S()
 {
    IEEEReciveActiv = false;
    I2sInProgress = false;
+#if 0
+   ReciveBufferPos = 0;
+   ReciveBufferLoad = 0;
+   DecodeBufferPos = 0;
+#endif
+   memset( rxUarteBuffer[0], 0, UARTE_RX_BUFF_SIZE);
+   memset( rxUarteBuffer[1], 0, UARTE_RX_BUFF_SIZE);
+   memset( rxUarteBuffer[2], 0, UARTE_RX_BUFF_SIZE);
 #if !I2SHAL
    nrf_drv_i2s_stop();
 #else
@@ -417,8 +475,11 @@ void stopI2S()
    *((volatile uint32_t *)0x40025038) = 1;/*Workaround for sdk issu*/
    *((volatile uint32_t *)0x4002503C) = 1;
 #endif
-   nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
-                  
+   if(!UarteInRecive)
+   {
+      UarteInRecive = true;
+      nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
+   }               
 }
 void setMacHead(uint8_t *message)
 {
@@ -438,7 +499,7 @@ void sendStateToUart(char id)
    if(id == 'I')
       txBuffer[length] = '\n';
    UarteInRecive = true;
-   nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));      
+   nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));   
    nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer, UARTE_TX_BUFF_SIZE);
 }
 void nrf_802154_transmitted(const uint8_t * p_frame, uint8_t * p_ack, uint8_t length, int8_t power, uint8_t lqi)
@@ -476,9 +537,7 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
      goto exit;
    memcpy(rxUarteBuffer[ReciveBufferPos], p_data + MACHEAD, (PAYLOAD + OPUSPACKHEAD));
    PacketNum = rxUarteBuffer[ReciveBufferPos][1];
-   //ReciveBufferLoad |= (1 << ReciveBufferPos); //new decode Buffer available
    ReciveBufferLoad++;
-   //ReciveBufferPos ^= (1 << 0);            //ReciveBufferLoad &= ~(1 << ReciveBufferPos) löschen 
    toggleBuffer(&ReciveBufferPos);   
    timeIEEEsent = timerCnt;
 
@@ -489,8 +548,6 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    Counter32[_IEEERECIVED]++;
    IEEEReciveActiv = true;
    PacketIsLost = false;
-   nrfx_uarte_rx_abort(&m_uart); //uart recive turn off
-
    
    memset( txBuffer2, 0, sizeof(txBuffer2));
    sprintf(txBuffer2, "RecTime:%d\tPackNum:%d\tBufLoad:%d\n", timerTotalCnt, PacketNum, ReciveBufferLoad);
@@ -566,19 +623,20 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
          break;
 
       case NRFX_UARTE_EVT_RX_DONE: 
+         if(!UarteInRecive)
+            break;
          if(!isOpusPacket(rxUarteBuffer[ReciveBufferPos], UARTE_RX_BUFF_SIZE) || IEEEReciveActiv)
          {
             nrfx_uarte_rx_abort(&m_uart); 
+            UarteInRecive = true;
             nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
             break;
          }
          PacketNum = rxUarteBuffer[ReciveBufferPos][1];
          UarteInRecive = false;
-         //ReciveBufferLoad |= (1 << ReciveBufferPos); //new decode Buffer available
          ReciveBufferLoad++;
-         //ReciveBufferPos ^= (1 << 0);            //ReciveBufferLoad &= ~(1 << ReciveBufferPos) löschen   
          toggleBuffer(&ReciveBufferPos);       
-         if(ReciveBufferLoad < 2)
+         if(!UarteInRecive && ReciveBufferLoad < 2)
             sendStateToUart('E');
          if(!State && ReciveBufferLoad > 1)
             State = 2;
@@ -611,6 +669,7 @@ int main(void)
    uint8_t lastPacketRec = 0; 
    uint8_t lastPacketNumSent = 0;
    uint16_t lastLostPacketCnt = 0; 
+
 
    UarteInRecive = true;
    nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
@@ -664,7 +723,6 @@ int main(void)
                else
                {
                   lastPacketNumSent = PacketNum;
-                  nrfx_uarte_rx_abort(&m_uart); 
                   stopI2S(); 
                   State = 0;
                }
