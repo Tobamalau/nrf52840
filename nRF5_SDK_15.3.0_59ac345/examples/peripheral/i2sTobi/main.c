@@ -83,19 +83,10 @@ volatile uint8_t ReciveBufferLoad = 0;
 volatile uint8_t DecodeBufferPos = 0;
 static volatile bool IEEE802154_tx_in_progress;
 static volatile bool IEEE802154_tx_done;
+volatile bool IEEEnewFrame = false;
 uint8_t opusPackNb = 1;
 nrfx_uarte_t m_uart = NRFX_UARTE_INSTANCE(0);
-#if 0
-nrf_drv_pwm_t m_pwm0 = NRF_DRV_PWM_INSTANCE(0);
-nrf_pwm_values_individual_t seq_values[] = {{0, 0, 0, 0}};
-nrf_pwm_sequence_t const seq =
-{
-    .values.p_individual = seq_values,
-    .length          = NRF_PWM_VALUES_LENGTH(seq_values),
-    .repeats         = 0,
-    .end_delay       = 0
-};
-#endif
+
 #if I2C_EN
 #define TWI_INSTANCE_ID     0
 #define TDA7901_ADDR        0b1101010    //0xd4d5,0xd6d7,0xd8d9,0xdadb//0b1101000
@@ -387,31 +378,6 @@ void initPeripheral()
    twi_init();
    TDA7901_set_mode();
 #endif
-#if 0 
-/*#### PWM ####*/
-    nrf_drv_pwm_config_t const config =
-
-    {
-        .output_pins =
-        {
-            4 | NRF_DRV_PWM_PIN_INVERTED, // channel 0
-            NRF_DRV_PWM_PIN_NOT_USED, // channel 1
-            NRF_DRV_PWM_PIN_NOT_USED, // channel 2
-            NRF_DRV_PWM_PIN_NOT_USED  // channel 3
-        },
-        .irq_priority = APP_IRQ_PRIORITY_LOWEST,
-        .base_clock   = NRF_PWM_CLK_16MHz,
-        .count_mode   = NRF_PWM_MODE_UP,
-        .top_value    = 2,
-        .load_mode    = NRF_PWM_LOAD_INDIVIDUAL,
-        .step_mode    = NRF_PWM_STEP_AUTO
-    };
-
-    nrf_drv_pwm_init(&m_pwm0, &config, NULL);
-
-   seq_values->channel_0 = duty_cycle;
-   nrf_drv_pwm_simple_playback(&m_pwm0, &seq, 1, NRF_DRV_PWM_FLAG_LOOP);
-#endif
 }   
 
 
@@ -459,13 +425,11 @@ void stopI2S()
    IEEEReciveActiv = false;
    I2sInProgress = false;
 #if 0
-   ReciveBufferPos = 0;
-   ReciveBufferLoad = 0;
-   DecodeBufferPos = 0;
-#endif
    memset( rxUarteBuffer[0], 0, UARTE_RX_BUFF_SIZE);
    memset( rxUarteBuffer[1], 0, UARTE_RX_BUFF_SIZE);
    memset( rxUarteBuffer[2], 0, UARTE_RX_BUFF_SIZE);
+#endif
+
 #if !I2SHAL
    nrf_drv_i2s_stop();
 #else
@@ -627,18 +591,17 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
             break;
          if(!isOpusPacket(rxUarteBuffer[ReciveBufferPos], UARTE_RX_BUFF_SIZE) || IEEEReciveActiv)
          {
-            nrfx_uarte_rx_abort(&m_uart); 
-            UarteInRecive = true;
-            nrfx_uarte_rx(&m_uart, rxUarteBuffer[ReciveBufferPos], sizeof(rxUarteBuffer[ReciveBufferPos]));
+            sendStateToUart('X');
             break;
          }
          PacketNum = rxUarteBuffer[ReciveBufferPos][1];
          UarteInRecive = false;
          ReciveBufferLoad++;
+         IEEEnewFrame = true;
          toggleBuffer(&ReciveBufferPos);       
-         if(!UarteInRecive && ReciveBufferLoad < 2)
+         if(!UarteInRecive && ReciveBufferLoad < 3)
             sendStateToUart('E');
-         if(!State && ReciveBufferLoad > 1)
+         if(!State && ReciveBufferLoad > 2)
             State = 2;
          break;
 
@@ -667,7 +630,6 @@ int main(void)
    initOpusFrame(&FrameInstanz);
 
    uint8_t lastPacketRec = 0; 
-   uint8_t lastPacketNumSent = 0;
    uint16_t lastLostPacketCnt = 0; 
 
 
@@ -714,7 +676,6 @@ int main(void)
                   }
                   else
                   {
-                     lastPacketNumSent = PacketNum;
                      Counter16[_IEEECONINTERRUPT]++;
                      stopI2S();
                      State = 0;
@@ -722,7 +683,6 @@ int main(void)
                }
                else
                {
-                  lastPacketNumSent = PacketNum;
                   stopI2S(); 
                   State = 0;
                }
@@ -794,10 +754,8 @@ int main(void)
             State = 1;
             break;                      
       }
-      if(lastPacketNumSent == 0xff && PacketNum == 0x01)
-         lastPacketNumSent = 0;
       /*### IEEE802.15.4 transmitt asynchron ###*/  
-      if(!IEEEReciveActiv && (lastPacketNumSent < PacketNum))
+      if(!IEEEReciveActiv && IEEEnewFrame)
       {
          if (!IEEE802154_tx_in_progress)
          {
@@ -807,7 +765,7 @@ int main(void)
             nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
             if(opusPackNb == 0xff)
                opusPackNb = 0;
-            lastPacketNumSent = PacketNum;
+            IEEEnewFrame = false;
          }
          else if(lastPacketRec != opusPackNb)   //just for debugging
          {
