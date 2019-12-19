@@ -78,6 +78,7 @@ uint8_t State = 0;
 volatile bool UarteInRecive = false;
 volatile bool I2sInProgress = false;
 volatile bool IEEEReciveActiv = false;
+volatile bool I2CAbort = false;
 volatile uint8_t ReciveBufferPos = 0;
 volatile uint8_t ReciveBufferLoad = 0;
 volatile uint8_t DecodeBufferPos = 0;
@@ -172,7 +173,9 @@ void TDA7901_set_mode(void)
    reg[1] = 0b01100010;
    err_code = nrf_drv_twi_tx(&m_twi, TDA7901_ADDR, reg, sizeof(reg), false);
    APP_ERROR_CHECK(err_code);
-   while (m_xfer_done == false);
+   while (m_xfer_done == false)
+      if(I2CAbort)
+         return;
    while (nrf_drv_twi_is_busy(&m_twi));
 
    read_sensor_data(reg[0]);
@@ -288,9 +291,11 @@ void initPeripheral()
    // Enable MCK generator
    NRF_I2S->CONFIG.MCKEN = (I2S_CONFIG_MCKEN_MCKEN_ENABLE << I2S_CONFIG_MCKEN_MCKEN_Pos);
    // MCKFREQ
-   NRF_I2S->CONFIG.MCKFREQ = 0x30000000  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;
-   // Ratio = 96
-   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_128X << I2S_CONFIG_RATIO_RATIO_Pos;    //64
+   NRF_I2S->CONFIG.MCKFREQ = I2S_CONFIG_MCKFREQ_MCKFREQ_32MDIV21  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;  //best clock config for 48kHz
+   //NRF_I2S->CONFIG.MCKFREQ = 0x30000000  << I2S_CONFIG_MCKFREQ_MCKFREQ_Pos;                         //clock config for TI AMP because need mclk
+
+   NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_32X << I2S_CONFIG_RATIO_RATIO_Pos;                  //best clock config for 48kHz
+   //NRF_I2S->CONFIG.RATIO = I2S_CONFIG_RATIO_RATIO_128X << I2S_CONFIG_RATIO_RATIO_Pos;                 //clock config for TI AMP because need mclk
    // Master mode, 16Bit, left aligned
    NRF_I2S->CONFIG.MODE = I2S_CONFIG_MODE_MODE_MASTER << I2S_CONFIG_MODE_MODE_Pos;
    NRF_I2S->CONFIG.SWIDTH = I2S_CONFIG_SWIDTH_SWIDTH_16BIT << I2S_CONFIG_SWIDTH_SWIDTH_Pos;
@@ -534,7 +539,11 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
          timerCnt++;
          timerTotalCnt++;
          if(timerCnt == 1000)
+         {
             timerCnt = 0;
+            if(!m_xfer_done)
+               I2CAbort = true;
+         }
          if(timerTotalCnt == 50000)
             timerTotalCnt = 0;
          break;
