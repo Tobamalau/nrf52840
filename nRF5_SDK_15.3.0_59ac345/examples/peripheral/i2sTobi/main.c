@@ -58,6 +58,7 @@
 const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
 #endif
 
+volatile bool StopAudio = false;
 volatile bool PacketIsLost = false;
 uint16_t Counter16[5];
 uint32_t Counter32[2];
@@ -425,12 +426,12 @@ void IEEE802154_init(uint8_t *message)
    nrf_802154_receive();
    nrf_802154_tx_power_set(8);
 }
-bool isAudioOff()
+bool isAudioOff(volatile uint8_t pos)
 {
    char str1[10];
    char str2[10];
    strcpy(str1, "EndOfFile");
-   memcpy(str2, rxUarteBuffer[ReciveBufferPos]+4, 9);
+   memcpy(str2, rxUarteBuffer[pos]+4, 9);
    str2[9] = '\0';
    return strcmp(str1, str2);
 }
@@ -438,6 +439,7 @@ void stopI2S()
 {
    IEEEReciveActiv = false;
    I2sInProgress = false;
+   StopAudio = false; 
 #if 0
    memset( rxUarteBuffer[0], 0, UARTE_RX_BUFF_SIZE);
    memset( rxUarteBuffer[1], 0, UARTE_RX_BUFF_SIZE);
@@ -514,21 +516,13 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - 2)))
      goto exit;
    memcpy(rxUarteBuffer[ReciveBufferPos], p_data + MACHEAD, (PAYLOAD + OPUSPACKHEAD));
-   if (!isAudioOff())  //EndOfFile
-   {
-      stopI2S(); 
-      State = 0;   
-      ReciveBufferLoad = 0;
-   }
-   PacketNum = rxUarteBuffer[ReciveBufferPos][1];
-   ReciveBufferLoad++;
-   toggleBuffer(&ReciveBufferPos);   
+   PacketNum = rxUarteBuffer[ReciveBufferPos][1];   
+   toggleBuffer(&ReciveBufferPos);
    timeIEEEsent = timerCnt;
-
-   if(!State && ReciveBufferLoad > 1)
-      State = 2;
-   
    nrf_gpio_pin_toggle(BSP_LED_1);
+   ReciveBufferLoad++;
+   if(!State && ReciveBufferLoad > 1)
+      State = 2; 
    Counter32[_IEEERECIVED]++;
    IEEEReciveActiv = true;
    PacketIsLost = false;
@@ -619,18 +613,9 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
             break;
          }
          PacketNum = rxUarteBuffer[ReciveBufferPos][1];
+         toggleBuffer(&ReciveBufferPos); 
          UarteInRecive = false;
-         if (!isAudioOff())  //EndOfFile
-         {
-            stopI2S(); 
-            State = 0;   
-            ReciveBufferLoad = 0;
-         }
-         else
-         {
-            ReciveBufferLoad++;
-            toggleBuffer(&ReciveBufferPos); 
-         }
+         ReciveBufferLoad++;       
          IEEEnewFrame = true;   
          if(!UarteInRecive && ReciveBufferLoad < 3)
             sendStateToUart('E');
@@ -694,7 +679,7 @@ int main(void)
             {
                if(IEEEReciveActiv)
                {
-                  if((Counter16[_IEEELOSTPACKET]-lastLostPacketCnt < MAXLOSTPACKETS))
+                  if((Counter16[_IEEELOSTPACKET]-lastLostPacketCnt < MAXLOSTPACKETS) && !StopAudio)
                   {
                      toggleBuffer(&bufferNr);                 //switch to latest Buffer
                      if(Counter16[_IEEELOSTPACKET] == lastLostPacketCnt)
@@ -709,7 +694,8 @@ int main(void)
                   }
                   else
                   {
-                     Counter16[_IEEECONINTERRUPT]++;
+                     if(!StopAudio)
+                        Counter16[_IEEECONINTERRUPT]++;
                      stopI2S();
                      State = 0;
                   }
@@ -746,19 +732,23 @@ int main(void)
             break;
 
          case 4:  /*### Decode Frame ###*/
-            FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;
-            FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;  
-            //ReciveBufferLoad &= ~(1 << DecodeBufferPos);                   //Delet Bufferloadmemory
+            if (!isAudioOff(DecodeBufferPos))  //EndOfFile
+               StopAudio = true;
+            else
+            {
+               if (!isAudioOff(ReciveBufferPos))  //EndOfFile
+      
+               FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;
+               FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;
+               /*new buffer request from Uarte*/
+               if(!UarteInRecive && !IEEEReciveActiv)
+                  sendStateToUart('W');
+
+               if(!getPcm(&FrameInstanz, bufferNr))
+                  APP_ERROR_CHECK(NRF_ERROR_BUSY);
+            }
             ReciveBufferLoad--;
-            //DecodeBufferPos ^= (1 << 0);                                   //switch to new Uart Buffer
             toggleBuffer(&DecodeBufferPos);
-
-            /*new buffer request from Uarte*/
-            if(!UarteInRecive && !IEEEReciveActiv)
-               sendStateToUart('W');
-
-            if(!getPcm(&FrameInstanz, bufferNr))
-               APP_ERROR_CHECK(NRF_ERROR_BUSY);
             if(!I2sInProgress)
                State = 5;
             else
