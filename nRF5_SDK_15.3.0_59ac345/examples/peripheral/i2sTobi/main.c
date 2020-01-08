@@ -425,6 +425,15 @@ void IEEE802154_init(uint8_t *message)
    nrf_802154_receive();
    nrf_802154_tx_power_set(8);
 }
+bool isAudioOff()
+{
+   char str1[10];
+   char str2[10];
+   strcpy(str1, "EndOfFile");
+   memcpy(str2, rxUarteBuffer[ReciveBufferPos]+4, 9);
+   str2[9] = '\0';
+   return strcmp(str1, str2);
+}
 void stopI2S()
 {
    IEEEReciveActiv = false;
@@ -505,6 +514,12 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - 2)))
      goto exit;
    memcpy(rxUarteBuffer[ReciveBufferPos], p_data + MACHEAD, (PAYLOAD + OPUSPACKHEAD));
+   if (!isAudioOff())  //EndOfFile
+   {
+      stopI2S(); 
+      State = 0;   
+      ReciveBufferLoad = 0;
+   }
    PacketNum = rxUarteBuffer[ReciveBufferPos][1];
    ReciveBufferLoad++;
    toggleBuffer(&ReciveBufferPos);   
@@ -605,9 +620,18 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
          }
          PacketNum = rxUarteBuffer[ReciveBufferPos][1];
          UarteInRecive = false;
-         ReciveBufferLoad++;
-         IEEEnewFrame = true;
-         toggleBuffer(&ReciveBufferPos);       
+         if (!isAudioOff())  //EndOfFile
+         {
+            stopI2S(); 
+            State = 0;   
+            ReciveBufferLoad = 0;
+         }
+         else
+         {
+            ReciveBufferLoad++;
+            toggleBuffer(&ReciveBufferPos); 
+         }
+         IEEEnewFrame = true;   
          if(!UarteInRecive && ReciveBufferLoad < 3)
             sendStateToUart('E');
          if(!State && ReciveBufferLoad > 2)
@@ -763,6 +787,12 @@ int main(void)
             State = 1;
             break;                      
       }
+      /*IEEE802.15.4 transmitted*/
+      if (IEEE802154_tx_done)
+      {
+         IEEE802154_tx_in_progress = false;
+         IEEE802154_tx_done   = false;
+      }
       /*### IEEE802.15.4 transmitt asynchron ###*/  
       if(!IEEEReciveActiv && IEEEnewFrame)
       {
@@ -781,13 +811,6 @@ int main(void)
             Counter16[_IEEENOTREADY]++;  
             lastPacketRec = opusPackNb;
          }
-      }
-
-      /*IEEE802.15.4 transmitted*/
-      if (IEEE802154_tx_done)
-      {
-         IEEE802154_tx_in_progress = false;
-         IEEE802154_tx_done   = false;
       }
       if(!nrf_gpio_pin_read(BSP_BUTTON_1))
       {
