@@ -613,12 +613,9 @@ void m_uart_callback(nrfx_uarte_event_t const * p_event, void * p_context)
             break;
          }
          PacketNum = rxUarteBuffer[ReciveBufferPos][1];
-         toggleBuffer(&ReciveBufferPos); 
          UarteInRecive = false;
          ReciveBufferLoad++;       
          IEEEnewFrame = true;   
-         if(!UarteInRecive && ReciveBufferLoad < 3)
-            sendStateToUart('E');
          if(!State && ReciveBufferLoad > 2)
             State = 2;
          break;
@@ -740,7 +737,10 @@ int main(void)
                FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;
                /*new buffer request from Uarte*/
                if(!UarteInRecive && !IEEEReciveActiv)
+               {
+                  toggleBuffer(&ReciveBufferPos);
                   sendStateToUart('W');
+               }
 
                if(!getPcm(&FrameInstanz, bufferNr))
                   APP_ERROR_CHECK(NRF_ERROR_BUSY);
@@ -780,13 +780,18 @@ int main(void)
       {
          IEEE802154_tx_in_progress = false;
          IEEE802154_tx_done   = false;
+         if(!UarteInRecive && ReciveBufferLoad < 3)
+         {
+            toggleBuffer(&ReciveBufferPos);
+            sendStateToUart('E');
+         }
       }
       /*### IEEE802.15.4 transmitt asynchron ###*/  
       if(!IEEEReciveActiv && IEEEnewFrame)
       {
          if (!IEEE802154_tx_in_progress)
          {
-            memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[DecodeBufferPos], (PAYLOAD + OPUSPACKHEAD));
+            memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[ReciveBufferPos], (PAYLOAD + OPUSPACKHEAD));
             IEEE802154_message[2] = opusPackNb;
             IEEE802154_tx_in_progress = true;
             nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
