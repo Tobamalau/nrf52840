@@ -736,8 +736,6 @@ int main(void)
                StopAudio = true;
             else
             {
-               if (!isAudioOff(ReciveBufferPos))  //EndOfFile
-      
                FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;
                FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;
                /*new buffer request from Uarte*/
