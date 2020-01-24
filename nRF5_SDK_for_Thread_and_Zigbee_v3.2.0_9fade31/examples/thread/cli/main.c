@@ -189,7 +189,7 @@ static void log_init(void)
 }
 
 
-/**@brief Function for initializing the Thread Stack.
+/*@brief Function for initializing the Thread Stack.*/
  
 static void thread_instance_init(void)
 {
@@ -207,7 +207,7 @@ static void thread_instance_init(void)
     uint32_t err_code = bsp_thread_init(thread_ot_instance_get()); //otSetStateChangedCallback(), otIcmp6RegisterHandler()
     APP_ERROR_CHECK(err_code);
 }
-*/
+
 
 /**@brief Function for deinitializing the Thread Stack.
  *
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
     initUdp(thread_ot_instance_get(), handleUdpReceive);
 #else
     thread_instance_init();
-    initUdp(thread_ot_instance_get());
+    //initUdp(thread_ot_instance_get());
 #endif
 
         

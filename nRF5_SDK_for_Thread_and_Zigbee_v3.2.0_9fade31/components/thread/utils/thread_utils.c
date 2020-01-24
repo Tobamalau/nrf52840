@@ -67,7 +67,8 @@
 #define UDP_PORT 1212
 #define THREAD_CONFIG 1
 
-static const char UDP_DEST_ADDR[] = "ff03::1";
+static const char UDP_DEST_ADDR[] = "ff02::1";
+//static const char UDP_DEST_ADDR[] = "fdde:ad00:beef:0:bb1:ebd6:ad10:f33";
 
 
 
@@ -90,10 +91,10 @@ void thread_init_Tobi(otStateChangedCallback handler)
     NRF_LOG_INFO("Thread version: %s", (uint32_t)otGetVersionString());
     NRF_LOG_INFO("Network name:   %s",
                  (uint32_t)otThreadGetNetworkName(mp_ot_instance));
-    //otCliUartInit(mp_ot_instance);
+    otCliUartInit(mp_ot_instance);
     thread_state_changed_callback_set(handler);
     setNetworkConfiguration(mp_ot_instance);
-    otThreadSetRouterRoleEnabled(mp_ot_instance, false);
+    //otThreadSetRouterRoleEnabled(mp_ot_instance, false);
 
     error = otIp6SetEnabled(mp_ot_instance, true); /* Start the Thread network interface (CLI cmd > ifconfig up) */
     ASSERT(error == OT_ERROR_NONE);
