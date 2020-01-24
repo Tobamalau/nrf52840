@@ -30,12 +30,13 @@
 #define TIMER_ENABLE 1
 #define I2SHAL 1
 #define I2C_EN 1
+#define CSMACA 0
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
 #define UARTE_TX_BUFF_SIZE 20
 #define GPIOTE_CHANNEL_0 0
 /*802.15.4 defines*/
-#define MACHEAD         9
+#define MACHEAD         2//9
 #define PAYLOAD         UARTE_RX_BUFF_SIZE - OPUSPACKHEAD
 #define DESTINATIONPAN  0x1234
 #define DESTINATION     0x5678
@@ -423,6 +424,7 @@ void IEEE802154_init(uint8_t *message)
    nrf_802154_extended_address_set(extended_address);
    nrf_802154_pan_id_set(pan_id);
    nrf_802154_channel_set(IEEECHANNEL);
+   nrf_802154_promiscuous_set(true);
    nrf_802154_receive();
    nrf_802154_tx_power_set(8);
 }
@@ -463,8 +465,8 @@ void stopI2S()
 }
 void setMacHead(uint8_t *message)
 {
-   message[0] = 0b01000001;                // Set MAC header: short addresses, no ACK 0100 0001 (0x41)
-   message[1] = 0b10101000;                // Set MAC header 1001 1000  (0x98)
+   message[0] = 0b00000001;                // Set MAC header: short addresses, no ACK 0100 0001 (0x41)
+   message[1] = 0b00100001;                // Set MAC header 1001 1000  (0x98)
    message[3] = DESTINATIONPAN&0xff;
    message[4] = (DESTINATIONPAN>>8)&0xff;
    message[5] = DESTINATION&0xff;
@@ -792,16 +794,20 @@ int main(void)
          if (!IEEE802154_tx_in_progress)
          {
             memcpy(IEEE802154_message+MACHEAD ,rxUarteBuffer[ReciveBufferPos], (PAYLOAD + OPUSPACKHEAD));
-            IEEE802154_message[2] = opusPackNb;
             IEEE802154_tx_in_progress = true;
+#if CSMACA
             nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
-            if(opusPackNb == 0xff)
-               opusPackNb = 0;
+#else
+            if(!nrf_802154_transmit(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE, false))
+               Counter16[_IEEENOTREADY]++;
+#endif
             IEEEnewFrame = false;
          }
          else if(lastPacketRec != opusPackNb)   //just for debugging
          {
-            Counter16[_IEEENOTREADY]++;  
+#if CSMACA
+            Counter16[_IEEENOTREADY]++; 
+#endif
             lastPacketRec = opusPackNb;
          }
       }
