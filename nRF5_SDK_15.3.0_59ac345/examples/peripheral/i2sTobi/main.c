@@ -41,7 +41,7 @@
 #define DESTINATION     0x5678
 #define SOURCE          0x0001
 #define MAX_MESSAGE_SIZE (MACHEAD + OPUSPACKHEAD + PAYLOAD)
-#define IEEECHANNEL        25
+#define IEEECHANNEL        11
 #define MAXLOSTPACKETS     5
 
 /*16 Bit Counter*/
@@ -463,8 +463,8 @@ void stopI2S()
 }
 void setMacHead(uint8_t *message)
 {
-   message[0] = 0x41;                // Set MAC header: short addresses, no ACK 0100 0001
-   message[1] = 0x98;                // Set MAC header 1001 1000
+   message[0] = 0b01000001;                // Set MAC header: short addresses, no ACK 0100 0001 (0x41)
+   message[1] = 0b10101000;                // Set MAC header 1001 1000  (0x98)
    message[3] = DESTINATIONPAN&0xff;
    message[4] = (DESTINATIONPAN>>8)&0xff;
    message[5] = DESTINATION&0xff;
