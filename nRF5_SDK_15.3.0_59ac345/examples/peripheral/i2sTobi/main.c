@@ -797,11 +797,14 @@ int main(void)
             IEEE802154_tx_in_progress = true;
 #if CSMACA
             nrf_802154_transmit_csma_ca(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE);
+            IEEEnewFrame = false;
 #else
-            if(!nrf_802154_transmit(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE, false))
+            if(nrf_802154_transmit(IEEE802154_message, (uint8_t)MAX_MESSAGE_SIZE, false))
+               IEEEnewFrame = false;
+            else
                Counter16[_IEEENOTREADY]++;
 #endif
-            IEEEnewFrame = false;
+            
          }
          else if(lastPacketRec != opusPackNb)   //just for debugging
          {
