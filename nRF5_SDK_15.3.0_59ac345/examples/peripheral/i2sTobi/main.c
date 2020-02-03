@@ -44,6 +44,7 @@
 #define MAX_MESSAGE_SIZE (MACHEAD + OPUSPACKHEAD + PAYLOAD)
 #define IEEECHANNEL        11
 #define MAXLOSTPACKETS     5
+#define IEEETXPOWER        8
 
 /*16 Bit Counter*/
 #define _IEEETRANSFAILED   0
@@ -63,6 +64,8 @@ volatile bool StopAudio = false;
 volatile bool PacketIsLost = false;
 uint16_t Counter16[5];
 uint32_t Counter32[2];
+uint32_t RSSISum = 0;
+uint32_t RSSIAverage = 0;
 
 volatile uint8_t PacketNum = 0;  //zu Array zusammenfassen
 volatile uint16_t timerCnt = 0;
@@ -426,7 +429,7 @@ void IEEE802154_init(uint8_t *message)
    nrf_802154_channel_set(IEEECHANNEL);
    nrf_802154_promiscuous_set(true);
    nrf_802154_receive();
-   nrf_802154_tx_power_set(8);
+   nrf_802154_tx_power_set(IEEETXPOWER);
 }
 bool isAudioOff(volatile uint8_t pos)
 {
@@ -512,7 +515,6 @@ void nrf_802154_cca_failed(nrf_802154_cca_error_t error)
 }
 void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t lqi)
 {
-   (void) power;
    (void) lqi;
 
    if (length > MAX_MESSAGE_SIZE + 2 || IEEE802154_tx_done || !isOpusPacket(p_data+MACHEAD, (length - MACHEAD - 2)))
@@ -526,6 +528,8 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    if(!State && ReciveBufferLoad > 1)
       State = 2; 
    Counter32[_IEEERECIVED]++;
+   RSSISum+=power*100;
+   RSSIAverage = (power/Counter32[_IEEERECIVED])/100;
    IEEEReciveActiv = true;
    PacketIsLost = false;
    
