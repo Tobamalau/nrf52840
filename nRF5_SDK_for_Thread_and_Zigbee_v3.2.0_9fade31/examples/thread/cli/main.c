@@ -64,6 +64,7 @@
 #define THREAD_CONFIG 1
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 static const unsigned char UDP_REQUEST[]   = "r";
+unsigned char audioPaket[104];
 
 int16_t Nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
 int16_t sendLoopCnt = 0;
@@ -84,14 +85,14 @@ static void bsp_event_handler(bsp_event_t event)
 {
     switch (event)
     {
-        case BSP_EVENT_KEY_0:
+        case BSP_EVENT_KEY_0:    //sende Hallo Welt
             NRF_LOG_INFO("Button 1 pressed");
             sendUdp(thread_ot_instance_get(), UDP_PAYLOAD, sizeof(UDP_PAYLOAD));            
             break;
 
-        case BSP_EVENT_KEY_1:
+        case BSP_EVENT_KEY_1:    //sende 104 Byte Payload
             NRF_LOG_INFO("Button 2 pressed");
-            sendUdp(thread_ot_instance_get(), opusData, NBbytes[0]);
+            sendUdp(thread_ot_instance_get(), opusData, 104);
             break;
 
         case BSP_EVENT_KEY_2:
@@ -101,13 +102,15 @@ static void bsp_event_handler(bsp_event_t event)
 
         case BSP_EVENT_KEY_3:
             NRF_LOG_INFO("Button 4 (send all) pressed");
-            int16_t nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
+            int16_t nbbytescnt = 0;
             uint32_t nbbytessum = 0;
             const unsigned char *input = opusData;
             
             for(int i = 0; i<nbbytescnt; i++)
             {
-              sendUdp(thread_ot_instance_get(), input, NBbytes[i]);
+               audioPaket[1]= nbbytescnt;
+
+              sendUdp(thread_ot_instance_get(), audioPaket, sizeof(audioPaket));
               /*while(!otLinkIsInTransmitState(thread_ot_instance_get())){
                   NRF_LOG_INFO("otLinkIsInTransmitState");
                   __WFE();
@@ -240,6 +243,13 @@ int main(int argc, char *argv[])
 
     uint32_t err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
     APP_ERROR_CHECK(err_code);
+
+   audioPaket[0]= 0xff;
+   audioPaket[2]= 0x64;
+   audioPaket[3]= 0x00;
+   for(int i=3; i<sizeof(audioPaket);i++)
+      audioPaket[i]= i;
+
 
 #endif    
 
