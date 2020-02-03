@@ -44,7 +44,7 @@
 #define MAX_MESSAGE_SIZE (MACHEAD + OPUSPACKHEAD + PAYLOAD)
 #define IEEECHANNEL        11
 #define MAXLOSTPACKETS     5
-#define IEEETXPOWER        8
+#define IEEETXPOWER        0
 
 /*16 Bit Counter*/
 #define _IEEETRANSFAILED   0
