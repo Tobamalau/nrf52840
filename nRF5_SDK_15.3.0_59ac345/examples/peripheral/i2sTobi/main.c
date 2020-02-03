@@ -64,8 +64,8 @@ volatile bool StopAudio = false;
 volatile bool PacketIsLost = false;
 uint16_t Counter16[5];
 uint32_t Counter32[2];
-uint32_t RSSISum = 0;
-uint32_t RSSIAverage = 0;
+uint32_t RSSISum;
+uint32_t RSSIAverage;
 
 volatile uint8_t PacketNum = 0;  //zu Array zusammenfassen
 volatile uint16_t timerCnt = 0;
@@ -288,6 +288,8 @@ void initPeripheral()
    uint32_t err;
    memset( Counter16, 0, sizeof(Counter16)); 
    memset( Counter32, 0, sizeof(Counter32));
+   RSSISum = 0;
+   RSSIAverage = 0;
 
 #if I2SHAL
 /*#### I2S ####*/
@@ -528,8 +530,8 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    if(!State && ReciveBufferLoad > 1)
       State = 2; 
    Counter32[_IEEERECIVED]++;
-   RSSISum+=power*100;
-   RSSIAverage = (power/Counter32[_IEEERECIVED])/100;
+   RSSISum+=abs(power);
+   RSSIAverage = (RSSISum/Counter32[_IEEERECIVED]);
    IEEEReciveActiv = true;
    PacketIsLost = false;
    
