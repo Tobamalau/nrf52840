@@ -684,7 +684,9 @@ int main(void)
                {
                   if((Counter16[_IEEELOSTPACKET]-lastLostPacketCnt < MAXLOSTPACKETS) && !StopAudio)
                   {
-                     toggleBuffer(&bufferNr);                 //switch to latest Buffer
+                     toggleBuffer(&bufferNr);                 //switch to last Buffer
+                     toggleBuffer(&bufferNr);                 
+
                      if(Counter16[_IEEELOSTPACKET] == lastLostPacketCnt)
                      {
                         lastPacketRec = PacketNum;
