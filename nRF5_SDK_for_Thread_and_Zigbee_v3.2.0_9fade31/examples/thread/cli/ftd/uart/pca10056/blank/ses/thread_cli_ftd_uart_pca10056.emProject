@@ -81,6 +81,7 @@
       <file file_name="../../../../../../../../modules/nrfx/soc/nrfx_atomic.c" />
       <file file_name="../../../../../../../../modules/nrfx/drivers/src/nrfx_clock.c" />
       <file file_name="../../../../../../../../modules/nrfx/drivers/src/nrfx_gpiote.c" />
+      <file file_name="../../../../../../../../modules/nrfx/drivers/src/nrfx_timer.c" />
     </folder>
     <folder Name="Board Support">
       <file file_name="../../../../../../../../components/libraries/bsp/bsp.c" />

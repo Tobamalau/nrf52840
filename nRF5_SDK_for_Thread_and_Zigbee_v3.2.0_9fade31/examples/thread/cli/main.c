@@ -52,6 +52,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log.h"
 #include "nrf_log_default_backends.h"
+#include "nrf_drv_timer.h"
 
 #include "thread_utils.h"
 #include "youtube48_8_vbr.c"
@@ -62,6 +63,13 @@
 #define SCHED_EVENT_DATA_SIZE APP_TIMER_SCHED_EVENT_DATA_SIZE /**< Maximum app_scheduler event size. */
 
 #define THREAD_CONFIG 1
+#define TIMER_ENABLE 1
+
+#if TIMER_ENABLE
+const nrf_drv_timer_t TIMER = NRF_DRV_TIMER_INSTANCE(0);
+bool SendOnOff = false;
+uint16_t sendCnt = 0;
+#endif
 static const unsigned char UDP_PAYLOAD[]   = "Hello New World!";
 static const unsigned char UDP_REQUEST[]   = "r";
 unsigned char audioPaket[104];
@@ -69,10 +77,36 @@ unsigned char audioPaket[104];
 int16_t Nbbytescnt = sizeof(NBbytes) / sizeof(NBbytes[0]);
 int16_t sendLoopCnt = 0;
 uint32_t Nbbytessum = 0;
-
+volatile uint16_t timerCnt = 0;
 
 void handleUdpReceive(void *aContext, otMessage *aMessage, 
                       const otMessageInfo *aMessageInfo);
+
+#if TIMER_ENABLE
+void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
+{
+   switch (event_type)
+   {
+     case NRF_TIMER_EVENT_COMPARE0:
+         timerCnt++;
+         if(timerCnt == 38)
+         {
+            if(SendOnOff)
+            {
+              audioPaket[1]= sendCnt;
+              sendUdp(thread_ot_instance_get(), audioPaket, sizeof(audioPaket));
+              sendCnt++;
+            }
+            timerCnt = 0;
+         }
+         break;
+
+     default:
+         //Do nothing.
+         break;
+   }
+}
+#endif
 /***************************************************************************************************
  * @section Callbacks
  **************************************************************************************************/
@@ -92,7 +126,7 @@ static void bsp_event_handler(bsp_event_t event)
 
         case BSP_EVENT_KEY_1:    //sende 104 Byte Payload
             NRF_LOG_INFO("Button 2 pressed");
-            sendUdp(thread_ot_instance_get(), opusData, 104);
+            sendUdp(thread_ot_instance_get(), audioPaket, sizeof(audioPaket));
             break;
 
         case BSP_EVENT_KEY_2:
@@ -104,9 +138,15 @@ static void bsp_event_handler(bsp_event_t event)
             NRF_LOG_INFO("Button 4 (send all) pressed");
             int16_t nbbytescnt = 0;
             uint32_t nbbytessum = 0;
+#if TIMER_ENABLE
             const unsigned char *input = opusData;
-            
-            for(int i = 0; i<nbbytescnt; i++)
+            if(!SendOnOff)
+               SendOnOff = true;
+            else
+               SendOnOff = false;
+#endif
+#if 0
+            for(int i = 0; i<100; i++)
             {
                audioPaket[1]= nbbytescnt;
 
@@ -118,6 +158,7 @@ static void bsp_event_handler(bsp_event_t event)
               nbbytessum += NBbytes[i];
               input = opusData + nbbytessum;
             }
+#endif
             //NRF_LOG_INFO("%d mal UDP send", i);
             break;
 
@@ -169,6 +210,22 @@ static void timer_init(void)
 {
     uint32_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
+
+    #if 0
+   /*Timer Init*/
+   uint32_t time_ms = 1; //Time(in miliseconds) between consecutive compare events.
+   uint32_t time_ticks;
+   //Configure TIMER for generating 1ms takt
+   nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
+   err_code = nrf_drv_timer_init(&TIMER, &timer_cfg, timer_event_handler);
+   APP_ERROR_CHECK(err_code);
+   time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER, time_ms);
+
+   nrf_drv_timer_extended_compare(
+      &TIMER, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
+
+   nrf_drv_timer_enable(&TIMER);
+   #endif
 }
 
 
@@ -263,7 +320,21 @@ int main(int argc, char *argv[])
     //initUdp(thread_ot_instance_get());
 #endif
 
-        
+#if TIMER_ENABLE
+         /*Timer Init*/
+   uint32_t time_ms = 1; //Time(in miliseconds) between consecutive compare events.
+   uint32_t time_ticks;
+   //Configure TIMER for generating 1ms takt
+   nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
+   err_code = nrf_drv_timer_init(&TIMER, &timer_cfg, timer_event_handler);
+   APP_ERROR_CHECK(err_code);
+   time_ticks = nrf_drv_timer_ms_to_ticks(&TIMER, time_ms);
+
+   nrf_drv_timer_extended_compare(
+      &TIMER, NRF_TIMER_CC_CHANNEL0, time_ticks, NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
+
+   nrf_drv_timer_enable(&TIMER);
+#endif   
         
 
         while (!thread_soft_reset_was_requested())

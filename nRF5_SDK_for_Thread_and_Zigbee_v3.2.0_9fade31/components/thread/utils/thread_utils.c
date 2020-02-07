@@ -65,9 +65,9 @@
 #include <openthread/code_utils.h>
 
 #define UDP_PORT 1212
-#define THREAD_CONFIG 1
+#define THREAD_CONFIG 0
 
-static const char UDP_DEST_ADDR[] = "ff02::1";
+static const char UDP_DEST_ADDR[] = "ff03::1";
 //static const char UDP_DEST_ADDR[] = "fdde:ad00:beef:0:bb1:ebd6:ad10:f33";
 
 
