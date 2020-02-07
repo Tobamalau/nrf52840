@@ -642,6 +642,7 @@ void toggleBuffer(volatile uint8_t *buffer)
 }
 int main(void)
 {
+   bool noBuffer = false;
    initPeripheral();
 
    uint8_t IEEE802154_message[MAX_MESSAGE_SIZE];
@@ -684,16 +685,16 @@ int main(void)
                {
                   if((Counter16[_IEEELOSTPACKET]-lastLostPacketCnt < MAXLOSTPACKETS) && !StopAudio)
                   {
-                     toggleBuffer(&bufferNr);                 //switch to latest Buffer
+                     //toggleBuffer(&bufferNr);                 //switch to latest Buffer
                      if(Counter16[_IEEELOSTPACKET] == lastLostPacketCnt)
-                     {
                         lastPacketRec = PacketNum;
-                     }
+
                      Counter16[_IEEELOSTPACKET]++;
                      memset( txBuffer2, 0, sizeof(txBuffer2));
                      sprintf(txBuffer2, "Timest: %d\tLostPack:%d\n", timerTotalCnt, Counter16[_IEEELOSTPACKET]);
                      nrfx_uarte_tx(&m_uart, (uint8_t *)txBuffer2, sizeof(txBuffer2));
-                     State = 6;
+                     noBuffer = true;
+                     State = 4;
                   }
                   else
                   {
@@ -723,15 +724,9 @@ int main(void)
                lastPacketRec = 0;
                if(!isOpusPacket(rxUarteBuffer[DecodeBufferPos], UARTE_RX_BUFF_SIZE))
                   State = 6;
-               else if(IEEEReciveActiv)
-                  State = 4;
                else
-                  State = 3;
+                  State = 4;
             }
-            break;
-
-         case 3:         
-            State = 4;
             break;
 
          case 4:  /*### Decode Frame ###*/
@@ -739,8 +734,19 @@ int main(void)
                StopAudio = true;
             else
             {
-               FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;
-               FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;
+               /*Error Consealment*/
+               if(noBuffer)   
+               {
+                  FrameInstanz.opus_t->input = NULL;
+                  FrameInstanz.opus_t->nbBytes = 0;
+                  noBuffer = false;
+               }
+               else
+               {
+                  FrameInstanz.opus_t->input = rxUarteBuffer[DecodeBufferPos] + 4;
+                  FrameInstanz.opus_t->nbBytes = UARTE_RX_BUFF_SIZE - 4;
+               }
+                  
                /*new buffer request from Uarte*/
                if(!UarteInRecive && !IEEEReciveActiv)
                {
