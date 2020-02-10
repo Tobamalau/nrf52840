@@ -33,6 +33,7 @@
 #define CSMACA 0
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
+#define UARTE_RX_BUFF 3
 #define UARTE_TX_BUFF_SIZE 20
 #define GPIOTE_CHANNEL_0 0
 /*802.15.4 defines*/
@@ -76,7 +77,7 @@ volatile uint16_t timelastI2SLoop = 0;
 
 volatile uint8_t bufferNr = 0;
 struct opus OpusInstanz = {NULL, NBBYTES, NULL, {}, {}};
-unsigned char rxUarteBuffer[3][UARTE_RX_BUFF_SIZE];
+unsigned char rxUarteBuffer[UARTE_RX_BUFF][UARTE_RX_BUFF_SIZE];
 char txBuffer[UARTE_TX_BUFF_SIZE];
 char txBuffer2[120];
 enum _State{Idle, CheckBuffer, SetBuffer, Decode, SeqEnd, AudioStart};
@@ -527,7 +528,8 @@ void nrf_802154_received(uint8_t * p_data, uint8_t length, int8_t power, uint8_t
    toggleBuffer(&ReciveBufferPos);
    timeIEEEsent = timerCnt;
    nrf_gpio_pin_toggle(BSP_LED_1);
-   ReciveBufferLoad++;
+   if(UARTE_RX_BUFF>ReciveBufferLoad)
+      ReciveBufferLoad++;
    if(State == Idle && ReciveBufferLoad > 1)
       State = CheckBuffer; 
    Counter32[_IEEERECIVED]++;
@@ -681,6 +683,8 @@ int main(void)
             } 
             break;
          case CheckBuffer:  //Buffer check
+            if(ReciveBufferLoad>3)
+               nrf_gpio_pin_toggle(BSP_LED_2);
             if(!ReciveBufferLoad)   //No Buffer
             {
                if(IEEEReciveActiv)
