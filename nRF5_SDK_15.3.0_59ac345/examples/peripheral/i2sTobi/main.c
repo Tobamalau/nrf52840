@@ -29,8 +29,8 @@
 #define VERBOSE 0
 #define TIMER_ENABLE 1
 #define I2SHAL 1
-#define I2C_EN 1
-#define CSMACA 0
+#define I2C_EN 0
+#define CSMACA 1
 
 #define UARTE_RX_BUFF_SIZE 104//(FRAME_SIZE/3 + 4) //hier erst normal nach Packeten suchen und Byteanzahl ermitteln
 #define UARTE_TX_BUFF_SIZE 20
@@ -42,7 +42,7 @@
 #define DESTINATION     0x5678
 #define SOURCE          0x0001
 #define MAX_MESSAGE_SIZE (MACHEAD + OPUSPACKHEAD + PAYLOAD)
-#define IEEECHANNEL        11
+#define IEEECHANNEL        25
 #define MAXLOSTPACKETS     3
 #define IEEETXPOWER        8
 
@@ -559,8 +559,10 @@ void timer_event_handler(nrf_timer_event_t event_type, void* p_context)
          if(timerCnt == 1000)
          {
             timerCnt = 0;
+#if I2C_EN     
             if(!m_xfer_done)
                I2CAbort = true;
+#endif
          }
          if(timerTotalCnt == 50000)
             timerTotalCnt = 0;
@@ -681,6 +683,8 @@ int main(void)
             } 
             break;
          case CheckBuffer:  //Buffer check
+            if(ReciveBufferLoad>3)
+               break;
             if(!ReciveBufferLoad)   //No Buffer
             {
                if(IEEEReciveActiv)
